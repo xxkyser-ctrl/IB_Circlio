@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IB Circlio",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Track Instagram follower and following changes locally with SQLite.",
   "icons": {
     "16": "icons/ib-16.png",

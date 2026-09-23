@@ -43,11 +43,11 @@ Excel reports are generated as formatted workbooks with separate Summary and Cha
 
 ## Download
 
-Download the latest `IB-Circlio-1.0.1-windows.zip` from the [GitHub Releases page](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest). Extract it, load the extracted folder as an unpacked extension, and double-click `run_server.bat`.
+Download the latest `IB-Circlio-1.0.2-windows.zip` from the [GitHub Releases page](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest). Extract it, load the extracted folder as an unpacked extension, and double-click `run_server.bat`.
 
 ## Use the portable release (recommended)
 
-Download the `IB Circlio-1.0.1-windows` release folder and keep its files together. It contains the extension files and four packaged Windows executables, so users do not need to install Python or any other runtime.
+Download the `IB Circlio-1.0.2-windows` release folder and keep its files together. It contains the extension files and four packaged Windows executables, so users do not need to install Python or any other runtime.
 
 1. Open your browser's extensions page:
    - Chrome: `chrome://extensions`
@@ -159,10 +159,10 @@ End users do not need these commands. They are only for building and publishing 
 
 1. Install Python 3.13 or newer.
 2. Run `py -3 -m pip install -r requirements-build.txt` — installs PyInstaller, which bundles Python into standalone `.exe` files.
-3. Run `py -3 build_release.py` — creates the portable folder under `release\IB Circlio-1.0.1-windows`.
+3. Run `py -3 build_release.py` — creates the portable folder under `release\IB Circlio-1.0.2-windows`.
 4. Zip that folder without changing its internal layout — this is the file to attach to a GitHub Release.
 5. `git add .` — stages source changes, never generated private data.
-6. `git commit -m "Release IB Circlio 1.0.1"` — records the changes locally.
+6. `git commit -m "Release IB Circlio 1.0.2"` — records the changes locally.
 7. `git push` — publishes the current branch to GitHub.
 
 The build creates `ib-circlio-launcher.exe`, `ib-circlio-server.exe`, `ib-circlio-result.exe`, and `ib-circlio-clear-database.exe`. PyInstaller bundles the Python runtime and standard-library dependencies into those executables.

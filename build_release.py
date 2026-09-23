@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 BUILD_DIR = ROOT / "build"
 DIST_DIR = ROOT / "dist"
-RELEASE_DIR = ROOT / "release" / "IB Circlio-1.0.1-windows"
+RELEASE_DIR = ROOT / "release" / "IB Circlio-1.0.2-windows"
 
 
 def run_pyinstaller(script, name):

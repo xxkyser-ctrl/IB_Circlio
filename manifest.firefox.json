@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IB Circlio",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Privacy-first local Instagram follower and following history tracker with SQLite and change detection.",
   "icons": {
     "16": "icons/ib-16.png",

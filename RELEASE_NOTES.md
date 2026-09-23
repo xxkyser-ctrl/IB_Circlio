@@ -1,4 +1,4 @@
-# IB Circlio v1.0.1
+# IB Circlio v1.0.2
 
 IB Circlio is a privacy-first local Instagram follower and following history tracker.
 
@@ -16,7 +16,7 @@ IB Circlio is a privacy-first local Instagram follower and following history tra
 
 ## Install
 
-1. Download `IB-Circlio-1.0.1-windows.zip`.
+1. Download `IB-Circlio-1.0.2-windows.zip`.
 2. Extract it to a normal folder.
 3. Load the extracted folder as an unpacked extension.
 4. Double-click `run_server.bat`.
