@@ -108,7 +108,7 @@ Firefox uses a different Manifest V3 background format. For Firefox, load the sa
 ### The only scripts users need
 
 - `run_server.bat`: start IB Circlio's private local database service. Leave its window open while collecting.
-- `result.bat`: open the latest totals and follower/following changes. It can optionally create a formatted `.xlsx` workbook.
+- `result.bat`: open the interactive report menu for changed users, Excel exports, saved lists, comparisons, and the latest summary.
 - `clear_database.bat`: permanently erase all saved data after a password and confirmation.
 
 Users do not need to open Command Prompt or type commands. The extension itself is loaded once through the browser's **Load unpacked** button; after that, normal use is only opening `run_server.bat`, clicking **Start collection**, and later opening `result.bat`.
@@ -141,7 +141,17 @@ Only a salted PBKDF2 password hash is stored in `clear-password.txt`; the passwo
 
 ### Viewing results
 
-Double-click [result.bat](./result.bat) after a collection. It shows the latest profile totals, collection timestamp, new accounts, removed accounts, and profile-picture changes. Use `result.bat browse` to inspect an older snapshot or `result.bat compare --from DATE --to DATE --list both` to compare arbitrary dates. Browse output uses the avatar version belonging to the selected snapshot. The formatted `.xlsx` workbook includes profile-picture changes with the previous and current local image paths on the Changes sheet. The extension popup intentionally contains only **Start collection**, **Stop**, status/error messages, and **Feedback / suggestions**. Use `result.bat` for reports and `clear_database.bat` for administration.
+Double-click [result.bat](./result.bat) after a collection. Its interactive menu provides:
+
+1. Show changed users from the latest complete snapshot.
+2. Generate an Excel workbook for today's collection.
+3. Generate an Excel workbook for any saved day.
+4. Browse every saved Followers, Following, or combined list.
+5. Compare two saved snapshots.
+6. Show the latest collection summary.
+7. Exit.
+
+The command-line forms remain available: use `result.bat browse` to inspect an older snapshot or `result.bat compare --from DATE --to DATE --list both` to compare arbitrary dates. Browse output uses the avatar version belonging to the selected snapshot. The formatted `.xlsx` workbook includes profile-picture changes with the previous and current local image paths on the Changes sheet. The extension popup intentionally contains only **Start collection**, **Stop**, status/error messages, and **Feedback / suggestions**. Use `result.bat` for reports and `clear_database.bat` for administration.
 
 ## Report output
 

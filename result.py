@@ -25,7 +25,7 @@ def choose_profile(connection, requested):
     return rows[choice - 1][0]
 
 
-def report(connection, profile):
+def report(connection, profile, prompt=True):
     collection = connection.execute(
         """SELECT c.id, c.captured_at, c.complete, c.followers_header_total,
                   c.following_header_total
@@ -65,13 +65,13 @@ def report(connection, profile):
     for change in avatar_differences:
         print(f"  {change['username']}: {change['from']} -> {change['to']}")
 
-    if input("\nShow changed usernames? [y/N] ").strip().lower() == "y":
+    if prompt and input("\nShow changed usernames? [y/N] ").strip().lower() == "y":
         for relationship in ("followers", "following"):
             for change in ("added", "removed"):
                 print(f"\n{relationship.title()} {change} ({collection_time}):")
                 print("\n".join(grouped[relationship][change]) or "(none)")
 
-    if input("\nCreate a formatted Excel workbook? [y/N] ").strip().lower() == "y":
+    if prompt and input("\nCreate a formatted Excel workbook? [y/N] ").strip().lower() == "y":
         output = Path.cwd() / f"ib-circlio_{profile}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
         write_workbook(output, profile, collection, grouped, connection, avatar_differences)
         print(f"Report written to: {output}")
@@ -203,6 +203,120 @@ def count_members(connection, collection_id, relationship):
 
 
 RELATIONSHIPS = ("followers", "following")
+
+
+def latest_collection(connection, profile):
+    return connection.execute(
+        """SELECT c.id, c.captured_at, c.complete, c.followers_header_total,
+                  c.following_header_total
+           FROM collections c JOIN profiles p ON p.id = c.profile_id
+           WHERE p.username = ? AND c.complete = 1
+           ORDER BY c.captured_at DESC, c.id DESC LIMIT 1""",
+        (profile,),
+    ).fetchone()
+
+
+def previous_collection(connection, profile, collection_id):
+    return connection.execute(
+        """SELECT c.id, c.captured_at, c.complete, c.followers_header_total,
+                  c.following_header_total
+           FROM collections c JOIN profiles p ON p.id = c.profile_id
+           WHERE p.username = ? AND c.complete = 1 AND c.id < ?
+           ORDER BY c.captured_at DESC, c.id DESC LIMIT 1""",
+        (profile, collection_id),
+    ).fetchone()
+
+
+def grouped_changes(connection, previous, current):
+    grouped = {
+        "followers": {"added": [], "removed": []},
+        "following": {"added": [], "removed": []},
+    }
+    for relationship in RELATIONSHIPS:
+        old = {row[0] for row in _members(connection, previous[0], relationship)} if previous else set()
+        new = {row[0] for row in _members(connection, current[0], relationship)}
+        grouped[relationship]["added"] = sorted(new - old)
+        grouped[relationship]["removed"] = sorted(old - new)
+    return grouped
+
+
+def generate_workbook(connection, profile, collection, output_directory=None):
+    previous = previous_collection(connection, profile, collection[0])
+    grouped = grouped_changes(connection, previous, collection)
+    differences = avatar_changes(connection, profile, collection[0])
+    output_directory = output_directory or Path.cwd()
+    output = output_directory / (
+        f"ib-circlio_{profile}_{collection[1][:10]}_{datetime.now():%H%M%S}.xlsx"
+    )
+    write_workbook(output, profile, collection, grouped, connection, differences)
+    print(f"Report written to: {output}")
+
+
+def show_changed_users(connection, profile):
+    collection = latest_collection(connection, profile)
+    if not collection:
+        raise ValueError(f"No complete collection found for {profile}.")
+    previous = previous_collection(connection, profile, collection[0])
+    grouped = grouped_changes(connection, previous, collection)
+    print(f"\nChanged users for {collection[1]}:")
+    if not previous:
+        print("No previous complete snapshot exists, so there are no changes to compare.")
+        return
+    for relationship in RELATIONSHIPS:
+        for change in ("added", "removed"):
+            print(f"\n{relationship.title()} {change}:")
+            print("\n".join(grouped[relationship][change]) or "(none)")
+    avatar_differences = avatar_changes(connection, profile, collection[0])
+    print("\nProfile picture changes:")
+    for change in avatar_differences:
+        print(f"{change['username']}: {change['from']} -> {change['to']}")
+    if not avatar_differences:
+        print("(none)")
+
+
+def interactive_menu(connection, profile):
+    while True:
+        print("\n=== IB Circlio reports ===")
+        print(f"Profile: {profile}")
+        print("1. Show changed users")
+        print("2. Generate Excel for today's collection")
+        print("3. Generate Excel for a specific day")
+        print("4. Browse all users from a saved snapshot")
+        print("5. Compare two saved snapshots")
+        print("6. Show latest collection summary")
+        print("7. Exit")
+        choice = input("\nChoose an option: ").strip()
+        try:
+            if choice == "1":
+                show_changed_users(connection, profile)
+            elif choice == "2":
+                today = date.today().isoformat()
+                collection = collection_for_date(connection, profile, today)
+                generate_workbook(connection, profile, collection)
+            elif choice == "3":
+                dates = snapshot_dates(connection, profile)
+                if not dates:
+                    raise ValueError(f"No complete snapshots found for {profile}.")
+                for index, snapshot in enumerate(dates, 1):
+                    print(f"{index}. {snapshot}")
+                selected = choose_snapshot_date(dates, "Choose a snapshot: ")
+                generate_workbook(
+                    connection, profile, collection_for_date(connection, profile, selected)
+                )
+            elif choice == "4":
+                browse(connection, profile)
+            elif choice == "5":
+                compare(connection, profile, interactive=True)
+            elif choice == "6":
+                report(connection, profile, prompt=False)
+            elif choice == "7" or choice.lower() in {"exit", "q", "quit"}:
+                print("Goodbye.")
+                return
+            else:
+                print("Invalid choice. Enter a number from 1 to 7.")
+        except (OSError, ValueError, IndexError, sqlite3.Error) as error:
+            print(f"\nError: {error}")
+        input("\nPress Enter to return to the menu...")
 
 
 def snapshot_dates(connection, profile):
@@ -365,7 +479,7 @@ def main():
             compare(connection, profile, args.from_snapshot, args.to_snapshot,
                     relationships, args.interactive)
         else:
-            report(connection, profile)
+            interactive_menu(connection, profile)
     finally:
         connection.close()
 
