@@ -162,16 +162,21 @@
 
   function headerTotal(listType) {
     const labels = listType === "followers"
-      ? ["followers", "abonnés", "seguidores"]
-      : ["following", "suivi", "abonnements", "seguidos"];
+      ? ["followers", "abonné", "seguidores"]
+      : ["following", "suivi", "abonnement", "seguidos"];
     const elements = [...document.querySelectorAll("a, button, li, span, div")]
       .filter((element) => element.offsetParent !== null);
     for (const element of elements) {
       const text = (element.textContent || "").trim().replace(/\s+/g, " ").toLowerCase();
-      if (labels.some((label) => text.endsWith(label))) {
-        const match = text.match(/([\d.,\s]+)\s+[a-zà-ÿ]+$/i);
-        const number = match?.[1].replace(/[^\d]/g, "");
-        if (number) return Number(number);
+      if (labels.some((label) => text.includes(label))) {
+        const match = text.match(/(\d[\d.,\s]*[kmb]?)\s*[a-zà-ÿ()[\]']+/i);
+        if (match) {
+          const raw = match[1].replace(/\s/g, "").replace(",", ".");
+          const suffix = raw.slice(-1).toLowerCase();
+          const multiplier = suffix === "k" ? 1000 : suffix === "m" ? 1000000 : suffix === "b" ? 1000000000 : 1;
+          const number = Number(suffix.match(/[kmb]/) ? raw.slice(0, -1) : raw.replace(/[^\d.]/g, ""));
+          if (Number.isFinite(number)) return Math.round(number * multiplier);
+        }
       }
     }
     return null;

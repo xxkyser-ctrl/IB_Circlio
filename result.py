@@ -52,9 +52,9 @@ def report(connection, profile):
     print(f"\nProfile: {profile}")
     print(f"Collection timestamp: {collection_time}")
     print(f"Status: {'complete' if collection[2] else 'partial (not used as a comparison baseline)'}")
-    print(f"Followers shown by Instagram: {collection[3] or 'unknown'}")
+    print(f"Followers shown by Instagram: {collection[3] if collection[3] is not None else 'unknown'}")
     print(f"Followers collected: {count_members(connection, collection[0], 'followers')}")
-    print(f"Following shown by Instagram: {collection[4] or 'unknown'}")
+    print(f"Following shown by Instagram: {collection[4] if collection[4] is not None else 'unknown'}")
     print(f"Following collected: {count_members(connection, collection[0], 'following')}")
     for relationship in ("followers", "following"):
         print(f"\n{relationship.title()} changes:")
@@ -117,9 +117,9 @@ def write_workbook(output, profile, collection, grouped, connection, avatar_diff
         ["Profile", profile],
         ["Collection timestamp", collection[1]],
         ["Status", "Complete" if collection[2] else "Partial"],
-        ["Followers shown by Instagram", collection[3] or "Unknown"],
+        ["Followers shown by Instagram", collection[3] if collection[3] is not None else "Unknown"],
         ["Followers collected", count_members(connection, collection[0], "followers")],
-        ["Following shown by Instagram", collection[4] or "Unknown"],
+        ["Following shown by Instagram", collection[4] if collection[4] is not None else "Unknown"],
         ["Following collected", count_members(connection, collection[0], "following")],
         ["New followers", len(grouped["followers"]["added"])],
         ["Removed followers", len(grouped["followers"]["removed"])],
@@ -160,9 +160,9 @@ def write_workbook(output, profile, collection, grouped, connection, avatar_diff
     styles = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>
-<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill></fills>
+<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE0F2FE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCFCE7"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
-<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>"""
+<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="3" borderId="0" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="4" borderId="0" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>"""
 
     def cell(value, style=0):
         value = escape(str(value))
@@ -171,8 +171,16 @@ def write_workbook(output, profile, collection, grouped, connection, avatar_diff
     def sheet(rows, widths):
         xml_rows = []
         for index, row in enumerate(rows, 1):
-            style = 1 if index == 1 or rows is summary_rows else 0
-            cells = "".join(cell(value, style if (rows is change_rows and index == 1) else 0) for value in row)
+            cells = []
+            for column, value in enumerate(row, 1):
+                if rows is summary_rows and column == 1:
+                    style = 2 if index % 2 else 3
+                elif rows is change_rows and index == 1:
+                    style = 1
+                else:
+                    style = 0
+                cells.append(cell(value, style))
+            cells = "".join(cells)
             xml_rows.append(f'<row r="{index}">{cells}</row>')
         cols = "".join(f'<col min="{i}" max="{i}" width="{width}" customWidth="1"/>' for i, width in enumerate(widths, 1))
         return f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>{cols}</cols><sheetData>{"".join(xml_rows)}</sheetData><autoFilter ref="A1:{chr(64 + len(rows[0]))}{len(rows)}"/></worksheet>'
