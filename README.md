@@ -69,7 +69,7 @@ The database and token are stored in `Desktop\Instagram Exporter Data`, not in t
 
 - **Automatic snapshots:** collect Followers and Following from the active Instagram profile with one button.
 - **Follower and following change detection:** identify new accounts, removed accounts, and changes between complete snapshots.
-- **Local profile-picture archive:** save encountered profile pictures under the local data directory. A persistent cache and same-run deduplication prevent downloading the same username twice; use `--refresh-avatars` when a fresh copy is needed.
+- **Dated local profile-picture archive:** save each encountered profile picture under the local data directory with its collection timestamp/version. If a user changes their image, the old and new files are both retained, and reports show the change. A persistent cache and same-run deduplication prevent downloading the same username twice; use `--refresh-avatars` when a fresh copy is needed.
 - **Date-based browsing:** interactively choose any saved snapshot date and display followers, following, or both, including local avatar paths when available.
 - **Arbitrary date comparisons:** compare any two snapshots in either order, not only the latest two.
 - **Privacy-first storage:** SQLite, avatars, tokens, and reports remain on the PC.
@@ -79,7 +79,7 @@ The database and token are stored in `Desktop\Instagram Exporter Data`, not in t
 
 1. The extension reads the visible Followers and Following dialogs on the active Instagram profile.
 2. It extracts usernames and available profile-picture URLs, then sends one authenticated collection payload to the local server.
-3. The SQLite backend saves the snapshot, downloads each avatar at most once per username, and reuses the persistent local avatar cache on later runs.
+3. The SQLite backend saves the snapshot, stores a dated avatar version for that snapshot, downloads each unchanged avatar at most once per username, and reuses the persistent local avatar cache on later runs. Changed profile pictures create a new file instead of overwriting the older version.
 4. Complete snapshots are compared with the selected earlier snapshot; partial snapshots are retained for inspection but excluded as comparison baselines.
 5. Use `result.bat`, `result.bat browse`, or `result.bat compare --from DATE --to DATE` to inspect the history.
 
@@ -141,7 +141,7 @@ Only a salted PBKDF2 password hash is stored in `clear-password.txt`; the passwo
 
 ### Viewing results
 
-Double-click [result.bat](./result.bat) after a collection. It shows the latest profile totals, collection timestamp, new accounts, and removed accounts. Use `result.bat browse` to inspect an older snapshot or `result.bat compare --from DATE --to DATE --list both` to compare arbitrary dates. It can optionally print usernames and local avatar paths, or create a formatted `.xlsx` workbook with Summary and Changes sheets. The extension popup intentionally contains only **Start collection**, **Stop**, status/error messages, and **Feedback / suggestions**. Use `result.bat` for reports and `clear_database.bat` for administration.
+Double-click [result.bat](./result.bat) after a collection. It shows the latest profile totals, collection timestamp, new accounts, removed accounts, and profile-picture changes. Use `result.bat browse` to inspect an older snapshot or `result.bat compare --from DATE --to DATE --list both` to compare arbitrary dates. Browse output uses the avatar version belonging to the selected snapshot. The formatted `.xlsx` workbook includes profile-picture changes with the previous and current local image paths on the Changes sheet. The extension popup intentionally contains only **Start collection**, **Stop**, status/error messages, and **Feedback / suggestions**. Use `result.bat` for reports and `clear_database.bat` for administration.
 
 ## Report output
 

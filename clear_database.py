@@ -55,6 +55,7 @@ def clear_database(path):
         for table in (
             "membership_changes",
             "collection_memberships",
+            "collection_avatar_versions",
             "collections",
             "profiles",
             "users",

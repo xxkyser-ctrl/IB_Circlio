@@ -61,6 +61,14 @@ CREATE TABLE IF NOT EXISTS avatar_cache (
     source_url TEXT,
     fetched_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS collection_avatar_versions (
+    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    image_path TEXT NOT NULL,
+    source_url TEXT,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (collection_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS collections (
     id INTEGER PRIMARY KEY,
     profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -214,24 +222,39 @@ class Database:
                 url = avatar_urls.get(username)
                 if not isinstance(url, str) or not url.startswith(("http://", "https://")):
                     continue
-                path = self._avatar_path(username, url, refresh_avatars)
+                user_id = db.execute(
+                    "SELECT id FROM users WHERE username = ?", (username,)
+                ).fetchone()["id"]
+                path, fetched_at = self._avatar_path(
+                    username, url, refresh_avatars, collection_id
+                )
                 if path:
                     db.execute("UPDATE users SET avatar_path = ? WHERE username = ?", (path, username))
+                    db.execute(
+                        """INSERT OR REPLACE INTO collection_avatar_versions
+                           (collection_id, user_id, image_path, source_url, fetched_at)
+                           VALUES (?, ?, ?, ?, ?)""",
+                        (collection_id, user_id, path, url, fetched_at),
+                    )
             db.commit()
         except Exception:
             db.rollback()
             raise
         return self.get_collection(collection_id)
 
-    def _avatar_path(self, username, source_url, refresh=False):
+    def _avatar_path(self, username, source_url, refresh=False, collection_id=None):
         row = self.connection.execute(
             "SELECT image_path, source_url FROM avatar_cache WHERE username = ?", (username,)
         ).fetchone()
         if row and not refresh and row["source_url"] == source_url and os.path.isfile(row["image_path"]):
-            return row["image_path"]
+            fetched = self.connection.execute(
+                "SELECT fetched_at FROM avatar_cache WHERE username = ?", (username,)
+            ).fetchone()["fetched_at"]
+            return row["image_path"], fetched
         avatar_dir = os.path.join(os.path.dirname(os.path.abspath(self.path)), "avatars")
         os.makedirs(avatar_dir, exist_ok=True)
-        destination = os.path.join(avatar_dir, f"{username}.jpg")
+        version = collection_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        destination = os.path.join(avatar_dir, f"{username}_{version}.jpg")
         try:
             request = urllib.request.Request(source_url, headers={"User-Agent": "IB-Circlio/1.0"})
             with urllib.request.urlopen(request, timeout=10) as response:
@@ -251,9 +274,9 @@ class Database:
                    source_url=excluded.source_url, fetched_at=excluded.fetched_at""",
                 (username, destination, source_url, now),
             )
-            return destination
+            return destination, now
         except (OSError, ValueError, urllib.error.URLError, urllib.error.HTTPError):
-            return None
+            return None, None
 
     @synchronized
     def get_collection(self, collection_id):
@@ -273,7 +296,7 @@ class Database:
                       "following": row["following_header_total"]
                   },
                   "followers": [], "following": [],
-                  "avatarPaths": {},
+                  "avatarPaths": {}, "avatarVersions": {}, "avatarChanges": [],
                   "changes": {"followers": {"added": [], "removed": []},
                               "following": {"added": [], "removed": []}}}
         memberships = self.connection.execute(
@@ -284,13 +307,36 @@ class Database:
         for membership in memberships:
             result[membership["relationship"]].append(membership["username"])
         avatars = self.connection.execute(
-            """SELECT u.username, u.avatar_path FROM collection_memberships cm
-               JOIN users u ON u.id = cm.user_id
-               WHERE cm.collection_id = ? AND u.avatar_path IS NOT NULL""",
+            """SELECT u.username, cav.image_path, cav.source_url, cav.fetched_at
+               FROM collection_avatar_versions cav
+               JOIN users u ON u.id = cav.user_id
+               WHERE cav.collection_id = ?""",
             (collection_id,),
         )
         for avatar in avatars:
-            result["avatarPaths"][avatar["username"]] = avatar["avatar_path"]
+            result["avatarPaths"][avatar["username"]] = avatar["image_path"]
+            result["avatarVersions"][avatar["username"]] = {
+                "imagePath": avatar["image_path"], "sourceUrl": avatar["source_url"],
+                "fetchedAt": avatar["fetched_at"]
+            }
+        previous = self.connection.execute(
+            """SELECT cav.source_url, u.username
+               FROM collection_avatar_versions cav JOIN users u ON u.id = cav.user_id
+               WHERE cav.collection_id = (
+                 SELECT id FROM collections WHERE profile_id = (
+                   SELECT profile_id FROM collections WHERE id = ?
+                 ) AND complete = 1 AND id < ?
+                 ORDER BY captured_at DESC, id DESC LIMIT 1
+               )""",
+            (collection_id, collection_id),
+        ).fetchall()
+        previous_urls = {row["username"]: row["source_url"] for row in previous}
+        for username, version in result["avatarVersions"].items():
+            if username in previous_urls and previous_urls[username] != version["sourceUrl"]:
+                result["avatarChanges"].append({
+                    "username": username, "from": previous_urls[username],
+                    "to": version["sourceUrl"]
+                })
         changes = self.connection.execute(
             """SELECT u.username, mc.relationship, mc.change FROM membership_changes mc
                JOIN users u ON u.id = mc.user_id WHERE mc.collection_id = ?

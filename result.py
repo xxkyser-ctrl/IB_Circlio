@@ -60,6 +60,10 @@ def report(connection, profile):
         print(f"\n{relationship.title()} changes:")
         print(f"  New: {len(grouped[relationship]['added'])}")
         print(f"  Removed: {len(grouped[relationship]['removed'])}")
+    avatar_differences = avatar_changes(connection, profile, collection[0])
+    print(f"\nProfile picture changes: {len(avatar_differences)}")
+    for change in avatar_differences:
+        print(f"  {change['username']}: {change['from']} -> {change['to']}")
 
     if input("\nShow changed usernames? [y/N] ").strip().lower() == "y":
         for relationship in ("followers", "following"):
@@ -69,11 +73,46 @@ def report(connection, profile):
 
     if input("\nCreate a formatted Excel workbook? [y/N] ").strip().lower() == "y":
         output = Path.cwd() / f"ib-circlio_{profile}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
-        write_workbook(output, profile, collection, grouped, connection)
+        write_workbook(output, profile, collection, grouped, connection, avatar_differences)
         print(f"Report written to: {output}")
 
 
-def write_workbook(output, profile, collection, grouped, connection):
+def avatar_changes(connection, profile, collection_id):
+    previous = connection.execute(
+        """SELECT cav.source_url, cav.image_path, u.username
+           FROM collection_avatar_versions cav
+           JOIN users u ON u.id = cav.user_id
+           JOIN collections c ON c.id = cav.collection_id
+           JOIN profiles p ON p.id = c.profile_id
+           WHERE p.username = ? AND c.complete = 1 AND c.id = (
+             SELECT previous.id FROM collections previous
+             WHERE previous.profile_id = c.profile_id AND previous.complete = 1
+               AND previous.id < ?
+             ORDER BY previous.captured_at DESC, previous.id DESC LIMIT 1
+           )""",
+        (profile, collection_id),
+    ).fetchall()
+    current = connection.execute(
+        """SELECT cav.source_url, cav.image_path, u.username
+           FROM collection_avatar_versions cav
+           JOIN users u ON u.id = cav.user_id
+           WHERE cav.collection_id = ?""",
+        (collection_id,),
+    ).fetchall()
+    previous_by_user = {row[2]: row for row in previous}
+    differences = []
+    for row in current:
+        old = previous_by_user.get(row[2])
+        if old and old[0] != row[0]:
+            differences.append({
+                "username": row[2],
+                "from": old[1],
+                "to": row[1],
+            })
+    return sorted(differences, key=lambda item: item["username"])
+
+
+def write_workbook(output, profile, collection, grouped, connection, avatar_differences=None):
     summary_rows = [
         ["Profile", profile],
         ["Collection timestamp", collection[1]],
@@ -92,6 +131,11 @@ def write_workbook(output, profile, collection, grouped, connection):
         for change in ("added", "removed"):
             for username in grouped[relationship][change]:
                 change_rows.append([collection[1], relationship.title(), change.title(), username])
+    for change in avatar_differences or avatar_changes(connection, profile, collection[0]):
+        change_rows.append([
+            collection[1], "Profile picture", "Changed",
+            f"{change['username']} | {change['from']} -> {change['to']}"
+        ])
 
     content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -225,8 +269,10 @@ def collection_for_date(connection, profile, snapshot):
 
 def _members(connection, collection_id, relationship):
     rows = connection.execute(
-        """SELECT u.username, u.avatar_path
+        """SELECT u.username, COALESCE(cav.image_path, u.avatar_path)
            FROM collection_memberships cm JOIN users u ON u.id = cm.user_id
+           LEFT JOIN collection_avatar_versions cav
+             ON cav.collection_id = cm.collection_id AND cav.user_id = cm.user_id
            WHERE cm.collection_id = ? AND cm.relationship = ?
            ORDER BY u.username""",
         (collection_id, relationship),
