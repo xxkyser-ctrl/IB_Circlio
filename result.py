@@ -1,10 +1,10 @@
-"""Interactive local report for the latest saved Instagram collection."""
+"""Local reports, snapshot browsing, and comparisons."""
 
 import argparse
 import sqlite3
 import zipfile
 from html import escape
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 
@@ -150,10 +150,151 @@ def count_members(connection, collection_id, relationship):
     ).fetchone()[0]
 
 
+RELATIONSHIPS = ("followers", "following")
+
+
+def snapshot_dates(connection, profile):
+    """Return the available snapshot dates in chronological order."""
+    rows = connection.execute(
+        """SELECT DISTINCT substr(c.captured_at, 1, 10) AS snapshot_date
+           FROM collections c JOIN profiles p ON p.id = c.profile_id
+           WHERE p.username = ? AND c.complete = 1
+           ORDER BY snapshot_date""",
+        (profile,),
+    ).fetchall()
+    return [row[0] for row in rows]
+
+
+def _valid_date(value):
+    try:
+        return date.fromisoformat(value).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def choose_snapshot_date(dates, prompt):
+    """Prompt until a numbered or ISO date selection is made."""
+    while True:
+        choice = input(prompt).strip()
+        if choice.isdigit():
+            index = int(choice) - 1
+            if 0 <= index < len(dates):
+                return dates[index]
+        else:
+            parsed = _valid_date(choice)
+            if parsed in dates:
+                return parsed
+        print("Invalid selection. Enter a listed number or date (YYYY-MM-DD).")
+
+
+def choose_relationship(prompt="Show [followers/following/both]: "):
+    while True:
+        value = input(prompt).strip().lower()
+        if value == "both":
+            return RELATIONSHIPS
+        if value in RELATIONSHIPS:
+            return (value,)
+        print("Invalid choice. Enter followers, following, or both.")
+
+
+def collection_for_date(connection, profile, snapshot):
+    """Resolve a date or collection id to the newest complete collection."""
+    parsed = _valid_date(snapshot)
+    if parsed:
+        row = connection.execute(
+            """SELECT c.id, c.captured_at
+               FROM collections c JOIN profiles p ON p.id = c.profile_id
+               WHERE p.username = ? AND c.complete = 1
+                 AND substr(c.captured_at, 1, 10) = ?
+               ORDER BY c.captured_at DESC, c.id DESC LIMIT 1""",
+            (profile, parsed),
+        ).fetchone()
+    elif str(snapshot).isdigit():
+        row = connection.execute(
+            """SELECT c.id, c.captured_at
+               FROM collections c JOIN profiles p ON p.id = c.profile_id
+               WHERE p.username = ? AND c.complete = 1 AND c.id = ?""",
+            (profile, int(snapshot)),
+        ).fetchone()
+    else:
+        row = None
+    if not row:
+        raise ValueError(f"No complete snapshot found for {profile} on {snapshot}.")
+    return row
+
+
+def _members(connection, collection_id, relationship):
+    rows = connection.execute(
+        """SELECT u.username, u.avatar_path
+           FROM collection_memberships cm JOIN users u ON u.id = cm.user_id
+           WHERE cm.collection_id = ? AND cm.relationship = ?
+           ORDER BY u.username""",
+        (collection_id, relationship),
+    ).fetchall()
+    return rows
+
+
+def browse(connection, profile):
+    dates = snapshot_dates(connection, profile)
+    if not dates:
+        raise ValueError(f"No complete snapshots found for {profile}.")
+    print("Available snapshots:")
+    for index, snapshot in enumerate(dates, 1):
+        print(f"{index}. {snapshot}")
+    selected = choose_snapshot_date(dates, "Choose a snapshot: ")
+    relationships = choose_relationship()
+    collection = collection_for_date(connection, profile, selected)
+    print(f"\nSnapshot: {selected} (collection {collection[0]})")
+    for relationship in relationships:
+        print(f"\n{relationship.title()}:")
+        for username, avatar_path in _members(connection, collection[0], relationship):
+            print(f"{username}" + (f" [{avatar_path}]" if avatar_path else ""))
+
+
+def compare(connection, profile, from_snapshot=None, to_snapshot=None,
+            relationships=None, interactive=False):
+    dates = snapshot_dates(connection, profile)
+    if len(dates) < 2:
+        raise ValueError("At least two complete snapshots are required.")
+    if interactive:
+        print("Available snapshots:")
+        for index, snapshot in enumerate(dates, 1):
+            print(f"{index}. {snapshot}")
+        from_snapshot = choose_snapshot_date(dates, "From snapshot: ")
+        to_snapshot = choose_snapshot_date(dates, "To snapshot: ")
+    elif (from_snapshot is None) != (to_snapshot is None):
+        raise ValueError("--from and --to must be supplied together.")
+    elif from_snapshot is None:
+        from_snapshot, to_snapshot = dates[-2], dates[-1]
+    from_collection = collection_for_date(connection, profile, str(from_snapshot))
+    to_collection = collection_for_date(connection, profile, str(to_snapshot))
+    if from_collection[0] == to_collection[0]:
+        raise ValueError("The two snapshots must be different.")
+    relationships = relationships or RELATIONSHIPS
+    # The labels describe the requested snapshots; ordering makes the diff
+    # deterministic even when the user supplies them in reverse order.
+    if from_collection[1] > to_collection[1]:
+        from_collection, to_collection = to_collection, from_collection
+    for relationship in relationships:
+        old = {row[0] for row in _members(connection, from_collection[0], relationship)}
+        new = {row[0] for row in _members(connection, to_collection[0], relationship)}
+        print(f"\n{relationship.title()} ({from_collection[1][:10]} → {to_collection[1][:10]}):")
+        for username in sorted(new - old):
+            print(f"+ {username}")
+        for username in sorted(old - new):
+            print(f"− {username}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--profile")
+    parser.add_argument("command", nargs="?", choices=("browse", "compare"))
+    parser.add_argument("--from", dest="from_snapshot")
+    parser.add_argument("--to", dest="to_snapshot")
+    parser.add_argument("--list", dest="relationships",
+                        choices=("followers", "following", "both"))
+    parser.add_argument("--interactive", action="store_true")
     args = parser.parse_args()
     database = Path(args.data_dir) / "instagram.db"
     if not database.exists():
@@ -161,7 +302,16 @@ def main():
     connection = sqlite3.connect(database)
     try:
         profile = choose_profile(connection, args.profile)
-        report(connection, profile)
+        if args.command == "browse":
+            browse(connection, profile)
+        elif args.command == "compare":
+            relationships = (args.relationships,) if args.relationships in RELATIONSHIPS else RELATIONSHIPS
+            if args.relationships == "both":
+                relationships = RELATIONSHIPS
+            compare(connection, profile, args.from_snapshot, args.to_snapshot,
+                    relationships, args.interactive)
+        else:
+            report(connection, profile)
     finally:
         connection.close()
 

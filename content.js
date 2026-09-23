@@ -38,7 +38,7 @@
     return selected;
   }
 
-  function extractUsernames(dialog, users) {
+  function extractUsernames(dialog, users, avatars) {
     let added = 0;
     for (const link of dialog.querySelectorAll("a[href]")) {
       const username = usernameFromHref(link.getAttribute("href"));
@@ -46,11 +46,13 @@
         users.add(username);
         added += 1;
       }
+      const image = link.querySelector("img[src]");
+      if (username && image && image.src && !avatars[username]) avatars[username] = image.src;
     }
     return added;
   }
 
-  async function scanDialog(listType) {
+  async function scanDialog(listType, avatars) {
     const dialog = findDialog();
     if (!dialog) throw new Error(`${listType} dialog not detected.`);
     const users = new Set();
@@ -61,7 +63,7 @@
       const liveDialog = findDialog();
       if (!liveDialog) throw new Error(`${listType} dialog closed during scan.`);
       const container = findScrollContainer(liveDialog);
-      const addedBeforeScroll = extractUsernames(liveDialog, users);
+      const addedBeforeScroll = extractUsernames(liveDialog, users, avatars);
       const previousTop = container.scrollTop;
       const step = Math.max(240, Math.floor(Math.max(container.clientHeight, 300) * 0.85));
       container.scrollTop = Math.min(container.scrollTop + step, container.scrollHeight);
@@ -74,7 +76,7 @@
       const refreshedDialog = findDialog();
       if (!refreshedDialog) throw new Error(`${listType} dialog closed during scan.`);
       const refreshedContainer = findScrollContainer(refreshedDialog);
-      const addedAfterScroll = extractUsernames(refreshedDialog, users);
+      const addedAfterScroll = extractUsernames(refreshedDialog, users, avatars);
       const added = addedBeforeScroll + addedAfterScroll;
       attempts += 1;
       chrome.runtime.sendMessage({ action: "scanProgress", listType, count: users.size, attempts });
@@ -194,7 +196,7 @@
       throw new Error("Open an Instagram profile before starting a collection.");
     }
     state.stopRequested = false;
-    const result = { followers: [], following: [], headerTotals: {
+    const result = { followers: [], following: [], avatars: {}, headerTotals: {
       followers: headerTotal("followers"),
       following: headerTotal("following")
     }};
@@ -203,7 +205,7 @@
         if (state.stopRequested) break;
         chrome.runtime.sendMessage({ action: "collectionProgress", message: `Opening ${listType}...` });
         await openList(listType);
-        result[listType] = await scanDialog(listType);
+        result[listType] = await scanDialog(listType, result.avatars);
         await closeDialog();
         await sleep(500);
       }
@@ -228,6 +230,7 @@
           profile: location.pathname.replace(/^\/|\/$/g, ""),
           followers: result.followers,
           following: result.following,
+          avatars: result.avatars,
           headerTotals: result.headerTotals,
           complete: result.complete
         }

@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import secrets
 import sqlite3
+import shutil
 from pathlib import Path
 
 
@@ -57,11 +58,16 @@ def clear_database(path):
             "collections",
             "profiles",
             "users",
+            "avatar_cache",
         ):
-            connection.execute(f"DELETE FROM {table}")
+            try:
+                connection.execute(f"DELETE FROM {table}")
+            except sqlite3.OperationalError:
+                pass
         connection.commit()
     finally:
         connection.close()
+    shutil.rmtree(path.parent / "avatars", ignore_errors=True)
     print("All profiles, collections, users, and changes were cleared.")
 
 

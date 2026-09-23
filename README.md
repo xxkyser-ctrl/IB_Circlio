@@ -1,6 +1,6 @@
-# IB Circlio
+# IB Circlio — Instagram Follower & Following Tracker
 
-IB Circlio is a local-first Instagram follower/following history tracker. It collects profile lists, stores timestamped snapshots in SQLite, compares complete snapshots, and provides a local result report.
+IB Circlio is a free, open-source **Instagram follower and following tracker**. It works as a **local Instagram follower history tool**: collect snapshots over time, detect **new followers**, **removed followers (unfollowers)**, and **following changes**, compare any two dates, and save everything **locally with SQLite** — no cloud, no account data leaves your machine.
 
 [![Latest release](https://img.shields.io/github/v/release/xxkyser-ctrl/IB_Circlio)](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest)
 [![Issues](https://img.shields.io/github/issues/xxkyser-ctrl/IB_Circlio)](https://github.com/xxkyser-ctrl/IB_Circlio/issues)
@@ -8,23 +8,38 @@ IB Circlio is a local-first Instagram follower/following history tracker. It col
 
 No cloud backend, no browser storage, no Instagram password, and no Instagram API credentials are required.
 
+## Contents
+
+- [Screenshots](#screenshots)
+- [Download](#download)
+- [Use the portable release](#use-the-portable-release-recommended)
+- [Features](#features)
+- [How It Works](#how-it-works)
+- [Browse snapshots and compare dates](#browse-snapshots-and-compare-dates)
+- [Supported browsers](#supported-browsers)
+- [Development mode](#development-mode-maintainers-only)
+- [Report output](#report-output)
+- [Local SQLite backend](#local-sqlite-backend)
+- [Finding IB Circlio on GitHub](#finding-ib-circlio-on-github)
+- [Security and privacy](#security-and-privacy)
+
 ## Screenshots
 
 The screenshots below use a redacted demo profile. Usernames and account identifiers are not included.
 
-![IB Circlio ready to start](docs/images/demo-start.png)
+![Instagram follower tracker ready to start](docs/images/demo-start.png)
 
-![IB Circlio scanning followers](docs/images/demo-followers.png)
+![Instagram follower tracker scanning followers](docs/images/demo-followers.png)
 
-![IB Circlio scanning following](docs/images/demo-following.png)
+![Instagram following tracker scanning following](docs/images/demo-following.png)
 
-![IB Circlio finished collection](docs/images/demo-finished.png)
+![Redacted Instagram follower tracker finished collection](docs/images/demo-finished.png)
 
-![Local server running](docs/images/demo-server.png)
+![Local SQLite tracker server running](docs/images/demo-server.png)
 
-![IB Circlio timestamped command report](docs/images/demo-result.png)
+![Timestamped Instagram follower comparison report](docs/images/demo-result.png)
 
-![Formatted Excel workbook](docs/images/demo-excel.png)
+Excel reports are generated as formatted workbooks with separate Summary and Changes sheets, colored headers, filters, usernames, and collection timestamps.
 
 ## Download
 
@@ -49,6 +64,40 @@ Download the `IB Circlio-1.0.1-windows` release folder and keep its files togeth
 8. Double-click `result.bat` later to view changes or create a formatted Excel workbook.
 
 The database and token are stored in `Desktop\Instagram Exporter Data`, not in the browser or the release folder.
+
+## Features
+
+- **Automatic snapshots:** collect Followers and Following from the active Instagram profile with one button.
+- **Follower and following change detection:** identify new accounts, removed accounts, and changes between complete snapshots.
+- **Local profile-picture archive:** save encountered profile pictures under the local data directory. A persistent cache and same-run deduplication prevent downloading the same username twice; use `--refresh-avatars` when a fresh copy is needed.
+- **Date-based browsing:** interactively choose any saved snapshot date and display followers, following, or both, including local avatar paths when available.
+- **Arbitrary date comparisons:** compare any two snapshots in either order, not only the latest two.
+- **Privacy-first storage:** SQLite, avatars, tokens, and reports remain on the PC.
+- **Partial-save support:** stopping midway preserves collected data without using an incomplete snapshot as a future complete baseline.
+
+## How It Works
+
+1. The extension reads the visible Followers and Following dialogs on the active Instagram profile.
+2. It extracts usernames and available profile-picture URLs, then sends one authenticated collection payload to the local server.
+3. The SQLite backend saves the snapshot, downloads each avatar at most once per username, and reuses the persistent local avatar cache on later runs.
+4. Complete snapshots are compared with the selected earlier snapshot; partial snapshots are retained for inspection but excluded as comparison baselines.
+5. Use `result.bat`, `result.bat browse`, or `result.bat compare --from DATE --to DATE` to inspect the history.
+
+## Browse snapshots and compare dates
+
+The report utility supports interactive snapshot browsing:
+
+```text
+result.bat browse
+```
+
+It lists available dates, accepts a number or date, then lets you display `followers`, `following`, or `both`. For scripting, compare any two dates:
+
+```text
+result.bat compare --from 2026-09-18 --to 2026-09-21 --list followers
+```
+
+Use `--list following` or `--list both` for the other relationship types. Running `result.bat compare` without dates keeps the backward-compatible latest-two comparison. Add `--refresh-avatars` to a collection/report command when you explicitly want cached profile pictures refreshed.
 
 ### Supported browsers
 
@@ -92,7 +141,7 @@ Only a salted PBKDF2 password hash is stored in `clear-password.txt`; the passwo
 
 ### Viewing results
 
-Double-click [result.bat](./result.bat) after a collection. It shows the latest profile totals, collection timestamp, new accounts, and removed accounts. It can optionally print their usernames and create a formatted `.xlsx` workbook with Summary and Changes sheets, colored headers, readable columns, filters, usernames, and timestamps. The extension popup intentionally contains only **Start collection**, **Stop**, status/error messages, and **Feedback / suggestions**. Use `result.bat` for reports and `clear_database.bat` for administration.
+Double-click [result.bat](./result.bat) after a collection. It shows the latest profile totals, collection timestamp, new accounts, and removed accounts. Use `result.bat browse` to inspect an older snapshot or `result.bat compare --from DATE --to DATE --list both` to compare arbitrary dates. It can optionally print usernames and local avatar paths, or create a formatted `.xlsx` workbook with Summary and Changes sheets. The extension popup intentionally contains only **Start collection**, **Stop**, status/error messages, and **Feedback / suggestions**. Use `result.bat` for reports and `clear_database.bat` for administration.
 
 ## Report output
 
@@ -124,6 +173,10 @@ The repository is:
 
 `https://github.com/xxkyser-ctrl/IB_Circlio`
 
+If you are searching for an **Instagram follower tracker** or **Instagram follower checker**, IB Circlio records local snapshots instead of requiring a cloud service. It also works as an **Instagram unfollower tracker**: you can investigate **who unfollowed me on Instagram** by comparing two saved dates. For people interested in an **Instagram following tracker**, it reports both followers and following changes.
+
+The project is also an **Instagram follower history** and **offline Instagram tracker** for users who want a privacy-first tool. It stores data in a local **Instagram SQLite database tracker** and can maintain an **Instagram profile picture archive** alongside each snapshot. The browser extension provides a free, open-source Instagram follower tracker workflow for Chromium browsers and Firefox.
+
 Someone who does not know the project name can search GitHub for terms such as:
 
 - `Instagram follower tracker`
@@ -131,19 +184,24 @@ Someone who does not know the project name can search GitHub for terms such as:
 - `SQLite Instagram exporter`
 - `local Instagram follower history`
 - `Chrome extension Instagram followers`
+- `Instagram unfollower tracker`
+- `who unfollowed me on Instagram`
+- `offline Instagram tracker`
+- `Instagram profile picture archive`
+- `free Instagram follower tracker open source`
 
 For best discoverability, set the repository description to:
 
-`Privacy-first local Instagram follower and following history tracker with SQLite, change detection, and a Chrome, Edge, Firefox, and Chromium browser extension.`
+`Privacy-first Instagram follower & following tracker with local SQLite history, snapshots, and unfollower detection.`
 
 Recommended repository topics:
 
-`instagram`, `instagram-extension`, `follower-tracker`, `following-tracker`, `social-graph`, `sqlite`, `chrome-extension`, `edge-extension`, `firefox-extension`, `browser-extension`, `python`, `privacy`
+`instagram`, `instagram-follower`, `follower-tracker`, `unfollower-tracker`, `instagram-tracker`, `sqlite`, `privacy`, `browser-extension`, `python`
 
 These metadata values should be applied to the GitHub repository itself, not only kept in this README:
 
-- Description: `Privacy-first local Instagram follower and following history tracker with SQLite, change detection, and a Chrome, Edge, Firefox, and Chromium browser extension.`
-- Topics: `instagram`, `instagram-extension`, `follower-tracker`, `following-tracker`, `social-graph`, `sqlite`, `chrome-extension`, `edge-extension`, `firefox-extension`, `browser-extension`, `python`, `privacy`
+- Description: `Privacy-first Instagram follower & following tracker with local SQLite history, snapshots, and unfollower detection.`
+- Topics: `instagram`, `instagram-follower`, `follower-tracker`, `unfollower-tracker`, `instagram-tracker`, `sqlite`, `privacy`, `browser-extension`, `python`
 
 To set these on GitHub: open the repository, choose **Settings**, edit the **Description**, and add the topics in the **Topics** field. Users can then find the project by searching those phrases or topics.
 

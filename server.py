@@ -7,6 +7,8 @@ import os
 import re
 import sqlite3
 import threading
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -50,7 +52,14 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE
+    username TEXT NOT NULL UNIQUE,
+    avatar_path TEXT
+);
+CREATE TABLE IF NOT EXISTS avatar_cache (
+    username TEXT PRIMARY KEY,
+    image_path TEXT NOT NULL,
+    source_url TEXT,
+    fetched_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS collections (
     id INTEGER PRIMARY KEY,
@@ -107,6 +116,10 @@ class Database:
             )
         except sqlite3.OperationalError:
             pass
+        try:
+            self.connection.execute("ALTER TABLE users ADD COLUMN avatar_path TEXT")
+        except sqlite3.OperationalError:
+            pass
         self.connection.commit()
 
     def close(self):
@@ -119,6 +132,10 @@ class Database:
             raise ValueError("profile must be an Instagram username")
         followers = normalize_users(payload.get("followers"))
         following = normalize_users(payload.get("following"))
+        avatar_urls = payload.get("avatars") or {}
+        if not isinstance(avatar_urls, dict):
+            avatar_urls = {}
+        refresh_avatars = bool(payload.get("refreshAvatars") or payload.get("refresh_avatars"))
         header_totals = payload.get("headerTotals") or {}
         followers_header_total = header_totals.get("followers")
         following_header_total = header_totals.get("following")
@@ -190,11 +207,53 @@ class Database:
                                VALUES (?, ?, ?, ?)""",
                             (collection_id, user_id, relationship, change),
                         )
+            # Avatar downloads are best effort: a bad/private image must not
+            # discard an otherwise valid collection.
+            all_usernames = set(followers) | set(following)
+            for username in sorted(all_usernames):
+                url = avatar_urls.get(username)
+                if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+                    continue
+                path = self._avatar_path(username, url, refresh_avatars)
+                if path:
+                    db.execute("UPDATE users SET avatar_path = ? WHERE username = ?", (path, username))
             db.commit()
         except Exception:
             db.rollback()
             raise
         return self.get_collection(collection_id)
+
+    def _avatar_path(self, username, source_url, refresh=False):
+        row = self.connection.execute(
+            "SELECT image_path, source_url FROM avatar_cache WHERE username = ?", (username,)
+        ).fetchone()
+        if row and not refresh and row["source_url"] == source_url and os.path.isfile(row["image_path"]):
+            return row["image_path"]
+        avatar_dir = os.path.join(os.path.dirname(os.path.abspath(self.path)), "avatars")
+        os.makedirs(avatar_dir, exist_ok=True)
+        destination = os.path.join(avatar_dir, f"{username}.jpg")
+        try:
+            request = urllib.request.Request(source_url, headers={"User-Agent": "IB-Circlio/1.0"})
+            with urllib.request.urlopen(request, timeout=10) as response:
+                content_type = response.headers.get_content_type()
+                if content_type not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+                    return None
+                data = response.read(5 * 1024 * 1024 + 1)
+                if not data or len(data) > 5 * 1024 * 1024:
+                    return None
+            with open(destination, "wb") as image_file:
+                image_file.write(data)
+            now = datetime.now(timezone.utc).isoformat()
+            self.connection.execute(
+                """INSERT INTO avatar_cache(username, image_path, source_url, fetched_at)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(username) DO UPDATE SET image_path=excluded.image_path,
+                   source_url=excluded.source_url, fetched_at=excluded.fetched_at""",
+                (username, destination, source_url, now),
+            )
+            return destination
+        except (OSError, ValueError, urllib.error.URLError, urllib.error.HTTPError):
+            return None
 
     @synchronized
     def get_collection(self, collection_id):
@@ -214,6 +273,7 @@ class Database:
                       "following": row["following_header_total"]
                   },
                   "followers": [], "following": [],
+                  "avatarPaths": {},
                   "changes": {"followers": {"added": [], "removed": []},
                               "following": {"added": [], "removed": []}}}
         memberships = self.connection.execute(
@@ -223,6 +283,14 @@ class Database:
         )
         for membership in memberships:
             result[membership["relationship"]].append(membership["username"])
+        avatars = self.connection.execute(
+            """SELECT u.username, u.avatar_path FROM collection_memberships cm
+               JOIN users u ON u.id = cm.user_id
+               WHERE cm.collection_id = ? AND u.avatar_path IS NOT NULL""",
+            (collection_id,),
+        )
+        for avatar in avatars:
+            result["avatarPaths"][avatar["username"]] = avatar["avatar_path"]
         changes = self.connection.execute(
             """SELECT u.username, mc.relationship, mc.change FROM membership_changes mc
                JOIN users u ON u.id = mc.user_id WHERE mc.collection_id = ?
