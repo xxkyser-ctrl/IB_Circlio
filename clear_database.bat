@@ -1,6 +1,7 @@
 @echo off
 setlocal
 
+set "PYTHONDONTWRITEBYTECODE=1"
 set "APP_DIR=%~dp0"
 set "DATA_DIR=%USERPROFILE%\Desktop\Instagram Exporter Data"
 
