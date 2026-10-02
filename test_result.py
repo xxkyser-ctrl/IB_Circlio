@@ -2,6 +2,7 @@ import contextlib
 import io
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -61,6 +62,22 @@ class SnapshotReportTests(unittest.TestCase):
                 contextlib.redirect_stdout(output):
             result.browse(self.database.connection, "owner")
         self.assertIn("alice [avatars/alice.jpg]", output.getvalue())
+
+    def test_snapshot_export_has_report_fields_and_writes_workbook(self):
+        self.save("2026-09-18T10:00:00+00:00", ["alice"], ["x"])
+        collection = result.collection_for_date(
+            self.database.connection, "owner", "2026-09-18"
+        )
+        self.assertEqual(len(collection), 5)
+        result.generate_workbook(
+            self.database.connection,
+            "owner",
+            collection,
+            Path(self.directory.name),
+        )
+        workbooks = list(Path(self.directory.name).glob("*.xlsx"))
+        self.assertEqual(len(workbooks), 1)
+        self.assertTrue(zipfile.is_zipfile(workbooks[0]))
 
 
 if __name__ == "__main__":

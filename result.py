@@ -368,7 +368,8 @@ def collection_for_date(connection, profile, snapshot):
     parsed = _valid_date(snapshot)
     if parsed:
         row = connection.execute(
-            """SELECT c.id, c.captured_at
+            """SELECT c.id, c.captured_at, c.complete, c.followers_header_total,
+                      c.following_header_total
                FROM collections c JOIN profiles p ON p.id = c.profile_id
                WHERE p.username = ? AND c.complete = 1
                  AND substr(c.captured_at, 1, 10) = ?
@@ -377,7 +378,8 @@ def collection_for_date(connection, profile, snapshot):
         ).fetchone()
     elif str(snapshot).isdigit():
         row = connection.execute(
-            """SELECT c.id, c.captured_at
+            """SELECT c.id, c.captured_at, c.complete, c.followers_header_total,
+                      c.following_header_total
                FROM collections c JOIN profiles p ON p.id = c.profile_id
                WHERE p.username = ? AND c.complete = 1 AND c.id = ?""",
             (profile, int(snapshot)),
