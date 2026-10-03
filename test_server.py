@@ -32,6 +32,10 @@ class AvatarCollectionTests(unittest.TestCase):
                 "followers": ["shared"],
                 "following": ["shared"],
                 "avatars": {"shared": "https://example.test/avatar"},
+                "headerTotalLabels": {
+                    "followers": "438 followers",
+                    "following": "849 following",
+                },
             }
             with patch("server.urllib.request.urlopen", return_value=Response()) as download:
                 collection = database.save_collection(payload)
@@ -43,6 +47,9 @@ class AvatarCollectionTests(unittest.TestCase):
             self.assertEqual(download.call_count, 1)
             second = database.get_collection(collection["id"] + 1)
             self.assertEqual(second["avatarPaths"]["shared"], first_path)
+            self.assertEqual(
+                second["headerTotalLabels"]["following"], "849 following"
+            )
             database.close()
 
     def test_changed_avatar_url_creates_version_and_reports_change(self):

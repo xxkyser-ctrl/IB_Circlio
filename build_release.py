@@ -9,10 +9,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 BUILD_DIR = ROOT / "build"
 DIST_DIR = ROOT / "dist"
-RELEASE_DIR = ROOT / "release" / "IB Circlio-1.0.2-windows"
+RELEASE_DIR = ROOT / "release" / "IB Circlio-1.0.3-windows"
 
 
-def run_pyinstaller(script, name):
+def run_pyinstaller(script, name, windowed=False):
+    interface_mode = "--windowed" if windowed else "--console"
     command = [
         sys.executable,
         "-m",
@@ -20,7 +21,7 @@ def run_pyinstaller(script, name):
         "--noconfirm",
         "--clean",
         "--onefile",
-        "--console",
+        interface_mode,
         "--name",
         name,
         "--distpath",
@@ -31,6 +32,8 @@ def run_pyinstaller(script, name):
         str(BUILD_DIR),
         str(ROOT / script),
     ]
+    if windowed:
+        command.extend(["--icon", str(ROOT / "icons" / "ib-circlio.ico")])
     subprocess.run(command, cwd=ROOT, check=True)
 
 
@@ -46,13 +49,15 @@ def main():
         ("launcher.py", "ib-circlio-launcher"),
         ("server.py", "ib-circlio-server"),
         ("result.py", "ib-circlio-result"),
+        ("result_gui.py", "ib-circlio-report"),
         ("clear_database.py", "ib-circlio-clear-database"),
     ):
-        run_pyinstaller(script, name)
+        run_pyinstaller(script, name, windowed=(script == "result_gui.py"))
         shutil.copy2(DIST_DIR / f"{name}.exe", RELEASE_DIR / f"{name}.exe")
     for filename in (
         "run_server.bat",
         "result.bat",
+        "result_gui.py",
         "clear_database.bat",
         "README.md",
         "RELEASE_NOTES.md",

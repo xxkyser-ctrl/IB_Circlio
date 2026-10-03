@@ -74,7 +74,9 @@ CREATE TABLE IF NOT EXISTS collections (
     profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     captured_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    complete INTEGER NOT NULL DEFAULT 1
+    complete INTEGER NOT NULL DEFAULT 1,
+    followers_header_text TEXT,
+    following_header_text TEXT
 );
 CREATE TABLE IF NOT EXISTS collection_memberships (
     collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
@@ -111,7 +113,10 @@ class Database:
         self.lock = threading.RLock()
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript(SCHEMA)
-        for column in ("followers_header_total", "following_header_total"):
+        for column in (
+            "followers_header_total", "following_header_total",
+            "followers_header_text", "following_header_text",
+        ):
             try:
                 self.connection.execute(
                     f"ALTER TABLE collections ADD COLUMN {column} INTEGER"
@@ -147,6 +152,15 @@ class Database:
         header_totals = payload.get("headerTotals") or {}
         followers_header_total = header_totals.get("followers")
         following_header_total = header_totals.get("following")
+        header_labels = payload.get("headerTotalLabels") or {}
+        followers_header_text = header_labels.get("followers")
+        following_header_text = header_labels.get("following")
+        if not isinstance(followers_header_text, str):
+            followers_header_text = None
+        if not isinstance(following_header_text, str):
+            following_header_text = None
+        followers_header_text = followers_header_text[:300] if followers_header_text else None
+        following_header_text = following_header_text[:300] if following_header_text else None
         complete = 1 if payload.get("complete", True) else 0
         captured_at = datetime.now(timezone.utc).isoformat()
         now = datetime.now(timezone.utc).isoformat()
@@ -180,8 +194,13 @@ class Database:
             db.execute(
                 """INSERT INTO collections
                    (profile_id, captured_at, created_at, followers_header_total,
-                    following_header_total, complete) VALUES (?, ?, ?, ?, ?, ?)""",
-                (profile_id, captured_at, now, followers_header_total, following_header_total, complete),
+                    following_header_total, complete, followers_header_text,
+                    following_header_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    profile_id, captured_at, now, followers_header_total,
+                    following_header_total, complete, followers_header_text,
+                    following_header_text,
+                ),
             )
             collection_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
             changes = {"followers": {"added": [], "removed": []},
@@ -260,7 +279,7 @@ class Database:
             with urllib.request.urlopen(request, timeout=10) as response:
                 content_type = response.headers.get_content_type()
                 if content_type not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
-                    return None
+                    return None, None
                 data = response.read(5 * 1024 * 1024 + 1)
                 if not data or len(data) > 5 * 1024 * 1024:
                     return None
@@ -282,7 +301,8 @@ class Database:
     def get_collection(self, collection_id):
         row = self.connection.execute(
             """SELECT c.id, p.username AS profile, c.captured_at, c.complete,
-                      c.followers_header_total, c.following_header_total
+                      c.followers_header_total, c.following_header_total,
+                      c.followers_header_text, c.following_header_text
                FROM collections c JOIN profiles p ON p.id = c.profile_id
                WHERE c.id = ?""", (collection_id,)
         ).fetchone()
@@ -294,6 +314,10 @@ class Database:
                   "headerTotals": {
                       "followers": row["followers_header_total"],
                       "following": row["following_header_total"]
+                  },
+                  "headerTotalLabels": {
+                      "followers": row["followers_header_text"],
+                      "following": row["following_header_text"]
                   },
                   "followers": [], "following": [],
                   "avatarPaths": {}, "avatarVersions": {}, "avatarChanges": [],
