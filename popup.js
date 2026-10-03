@@ -48,8 +48,23 @@ function setBusy(isBusy) {
   document.getElementById("stop").disabled = !isBusy;
 }
 
+async function refreshCollectionState() {
+  try {
+    const tab = await getActiveInstagramTab();
+    const response = await sendToTab(tab.id, { action: "getCollectionState" });
+    if (!response?.ok) throw new Error(response?.error || "Could not read collection status.");
+    setBusy(Boolean(response.state.active));
+    setStatus(response.state.status || "Ready to collect the current profile.");
+  } catch (error) {
+    setBusy(false);
+    setStatus(`Status unavailable: ${error.message}`);
+  }
+}
+
 async function startCollection() {
+  if (startButton.disabled) return;
   setBusy(true);
+  let collectionError = null;
   try {
     const tab = await getActiveInstagramTab();
     setStatus("Connecting to the profile...");
@@ -66,9 +81,10 @@ async function startCollection() {
       ? `Saved ${collection.followers.length} followers and ${collection.following.length} following.`
       : "Collection stopped. The collected data was saved as a partial snapshot.");
   } catch (error) {
-    setStatus(`Collection error: ${error.message}`);
+    collectionError = error.message;
   } finally {
-    setBusy(false);
+    await refreshCollectionState();
+    if (collectionError) setStatus(`Collection error: ${collectionError}`);
   }
 }
 
@@ -76,7 +92,8 @@ startButton.addEventListener("click", startCollection);
 document.getElementById("stop").addEventListener("click", async () => {
   try {
     const tab = await getActiveInstagramTab();
-    await sendToTab(tab.id, { action: "stop" });
+    const response = await sendToTab(tab.id, { action: "stop" });
+    if (!response?.ok) throw new Error(response?.error || "Could not stop the collection.");
     setStatus("Stopping collection...");
   } catch (error) {
     setStatus(error.message);
@@ -89,4 +106,12 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "scanProgress" || message.action === "collectionProgress") {
     setStatus(message.message || `Scanning ${message.listType}: ${message.count} collected`);
   }
+  if (message.action === "collectionState" || message.action === "scanProgress" ||
+      message.action === "collectionProgress") {
+    refreshCollectionState();
+  }
 });
+
+setBusy(true);
+refreshCollectionState();
+window.setInterval(refreshCollectionState, 700);

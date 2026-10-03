@@ -1,5 +1,9 @@
 (() => {
-  const state = { stopRequested: false };
+  const state = {
+    stopRequested: false,
+    running: false,
+    status: "Ready to collect the current profile."
+  };
   const excludedPaths = new Set([
     "accounts", "direct", "explore", "reel", "reels", "stories", "p", "tv", "create"
   ]);
@@ -46,7 +50,16 @@
         users.add(username);
         added += 1;
       }
-      const image = link.querySelector("img[src]");
+      const row = link.closest('[role="listitem"], li') ||
+        link.parentElement?.parentElement;
+      const images = [
+        ...link.querySelectorAll("img[src]"),
+        ...(row ? row.querySelectorAll("img[src]") : [])
+      ];
+      const image = images.find((candidate) =>
+        candidate.src &&
+        (!candidate.alt || candidate.alt.toLowerCase().includes(username))
+      ) || images.find((candidate) => candidate.src);
       if (username && image && image.src && !avatars[username]) avatars[username] = image.src;
     }
     return added;
@@ -79,7 +92,9 @@
       const addedAfterScroll = extractUsernames(refreshedDialog, users, avatars);
       const added = addedBeforeScroll + addedAfterScroll;
       attempts += 1;
-      chrome.runtime.sendMessage({ action: "scanProgress", listType, count: users.size, attempts });
+      sendCollectionState(true, `Scanning ${listType}: ${users.size} usernames found`, {
+        listType, count: users.size, attempts
+      });
 
       if (added === 0) stableAttempts += 1;
       else stableAttempts = 0;
@@ -90,7 +105,10 @@
         visibleLinks[visibleLinks.length - 1]?.scrollIntoView({ block: "end" });
         await sleep(500);
       }
-      if (stableAttempts >= 4 && atBottom && refreshedContainer.scrollHeight > refreshedContainer.clientHeight) break;
+      if (stableAttempts >= 4 && atBottom) break;
+    }
+    if (attempts >= 400 && !state.stopRequested) {
+      throw new Error(`${listType} scan reached the safety limit; this snapshot will be saved as partial.`);
     }
     return [...users].sort();
   }
@@ -161,25 +179,51 @@
   }
 
   function headerTotal(listType) {
-    const labels = listType === "followers"
-      ? ["followers", "abonné", "seguidores"]
-      : ["following", "suivi", "abonnement", "seguidos"];
-    const elements = [...document.querySelectorAll("a, button, li, span, div")]
-      .filter((element) => element.offsetParent !== null);
-    for (const element of elements) {
-      const text = (element.textContent || "").trim().replace(/\s+/g, " ").toLowerCase();
-      if (labels.some((label) => text.includes(label))) {
-        const match = text.match(/(\d[\d.,\s]*[kmb]?)\s*[a-zà-ÿ()[\]']+/i);
-        if (match) {
-          const raw = match[1].replace(/\s/g, "").replace(",", ".");
-          const suffix = raw.slice(-1).toLowerCase();
-          const multiplier = suffix === "k" ? 1000 : suffix === "m" ? 1000000 : suffix === "b" ? 1000000000 : 1;
-          const number = Number(suffix.match(/[kmb]/) ? raw.slice(0, -1) : raw.replace(/[^\d.]/g, ""));
-          if (Number.isFinite(number)) return Math.round(number * multiplier);
-        }
-      }
+    const link = profileLink(listType);
+    if (!link) return null;
+    const text = [
+      link.getAttribute("aria-label"),
+      link.getAttribute("title"),
+      link.textContent
+    ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const match = text.match(/(\d[\d.,\s]*[kmb]?)\s*([a-z()]+)/i);
+    if (!match) return null;
+    const label = match[2];
+    const isExpectedLabel = listType === "followers"
+      ? label.includes("follower") || label.includes("abonn") || label.includes("seguidor")
+      : label.includes("following") || label.includes("suivi") ||
+        label.includes("abonn") || label.includes("seguid");
+    if (!isExpectedLabel) return null;
+
+    const raw = match[1].replace(/\s/g, "");
+    const suffix = raw.slice(-1).toLowerCase();
+    const multiplier = suffix === "k" ? 1000 : suffix === "m" ? 1000000 :
+      suffix === "b" ? 1000000000 : 1;
+    let numeric = multiplier === 1 ? raw : raw.slice(0, -1);
+    if (numeric.includes(",") && numeric.includes(".")) {
+      numeric = numeric.lastIndexOf(",") > numeric.lastIndexOf(".")
+        ? numeric.replace(/\./g, "").replace(",", ".")
+        : numeric.replace(/,/g, "");
+    } else if (multiplier !== 1) {
+      numeric = numeric.replace(",", ".");
+    } else {
+      numeric = numeric.replace(/[.,]/g, "");
     }
-    return null;
+    const parsed = Number(numeric);
+    const total = Number.isFinite(parsed) ? Math.round(parsed * multiplier) : null;
+    if (listType === "following" && total !== null && total > 7500) return null;
+    return total;
+  }
+
+  function headerTotalLabel(listType) {
+    const link = profileLink(listType);
+    if (!link) return null;
+    return [
+      link.getAttribute("aria-label"),
+      link.getAttribute("title"),
+      link.textContent
+    ].filter(Boolean).join(" | ").replace(/\s+/g, " ").trim().slice(0, 300);
   }
 
   async function openList(listType) {
@@ -190,6 +234,7 @@
     for (let attempt = 0; attempt < 30; attempt += 1) {
       await sleep(250);
       if (findDialog()) {
+        await sleep(500);
         return;
       }
     }
@@ -197,18 +242,30 @@
   }
 
   async function collectProfile() {
+    if (state.running) throw new Error("A collection is already in progress in this tab.");
     if (!/^\/[^/]+\/?$/.test(location.pathname)) {
       throw new Error("Open an Instagram profile before starting a collection.");
     }
+    state.running = true;
     state.stopRequested = false;
-    const result = { followers: [], following: [], avatars: {}, headerTotals: {
-      followers: headerTotal("followers"),
-      following: headerTotal("following")
-    }};
+    sendCollectionState(true, "Starting collection...");
+    const result = {
+      followers: [],
+      following: [],
+      avatars: {},
+      headerTotals: {
+        followers: headerTotal("followers"),
+        following: headerTotal("following")
+      },
+      headerTotalLabels: {
+        followers: headerTotalLabel("followers"),
+        following: headerTotalLabel("following")
+      }
+    };
     try {
       for (const listType of ["followers", "following"]) {
         if (state.stopRequested) break;
-        chrome.runtime.sendMessage({ action: "collectionProgress", message: `Opening ${listType}...` });
+        sendCollectionState(true, `Opening ${listType}...`);
         await openList(listType);
         result[listType] = await scanDialog(listType, result.avatars);
         await closeDialog();
@@ -228,37 +285,72 @@
     if (state.stopRequested) result.complete = false;
     if (result.error) result.complete = false;
 
-    const saveResponse = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        action: "saveCollection",
-        collection: {
-          profile: location.pathname.replace(/^\/|\/$/g, ""),
-          followers: result.followers,
-          following: result.following,
-          avatars: result.avatars,
-          headerTotals: result.headerTotals,
-          complete: result.complete
-        }
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else if (!response?.ok) {
-          reject(new Error(response?.error || "Could not save the collection."));
-        } else {
-          resolve(response);
-        }
+    try {
+      const saveResponse = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          action: "saveCollection",
+          collection: {
+            profile: location.pathname.replace(/^\/|\/$/g, ""),
+            followers: result.followers,
+            following: result.following,
+            avatars: result.avatars,
+            headerTotals: result.headerTotals,
+            headerTotalLabels: result.headerTotalLabels,
+            complete: result.complete
+          }
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (!response?.ok) {
+            reject(new Error(response?.error || "Could not save the collection."));
+          } else {
+            resolve(response);
+          }
+        });
       });
-    });
-    return {
-      ...result,
-      collection: saveResponse.collection,
-      stopped: !result.complete,
-      error: result.error || null
-    };
+      const collection = saveResponse.collection;
+      const status = result.error
+        ? `Partial snapshot saved: ${result.error}`
+        : collection.complete
+          ? `Saved ${collection.followers.length} followers and ${collection.following.length} following.`
+          : "Collection stopped. Partial snapshot saved.";
+      sendCollectionState(false, status);
+      return {
+        ...result,
+        collection,
+        stopped: !result.complete,
+        error: result.error || null
+      };
+    } catch (error) {
+      sendCollectionState(false, `Collection failed: ${error.message}`);
+      throw error;
+    } finally {
+      state.running = false;
+    }
+  }
+
+  function sendCollectionState(active, status, details = {}) {
+    state.running = active;
+    state.status = status;
+    chrome.runtime.sendMessage({
+      action: "collectionState",
+      state: { active, status, ...details }
+    }).catch(() => {});
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.action === "getCollectionState") {
+      sendResponse({
+        ok: true,
+        state: { active: state.running, status: state.status }
+      });
+      return;
+    }
     if (message.action === "startCollection") {
+      if (state.running) {
+        sendResponse({ ok: false, error: "A collection is already in progress in this tab." });
+        return;
+      }
       collectProfile()
         .then((result) => sendResponse({ ok: true, ...result }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));

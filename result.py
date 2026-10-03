@@ -52,9 +52,15 @@ def report(connection, profile, prompt=True):
     print(f"\nProfile: {profile}")
     print(f"Collection timestamp: {collection_time}")
     print(f"Status: {'complete' if collection[2] else 'partial (not used as a comparison baseline)'}")
-    print(f"Followers shown by Instagram: {collection[3] if collection[3] is not None else 'unknown'}")
+    print(
+        "Followers shown by Instagram: "
+        f"{verified_header_total(connection, collection[0], 'followers', collection[3])}"
+    )
     print(f"Followers collected: {count_members(connection, collection[0], 'followers')}")
-    print(f"Following shown by Instagram: {collection[4] if collection[4] is not None else 'unknown'}")
+    print(
+        "Following shown by Instagram: "
+        f"{verified_header_total(connection, collection[0], 'following', collection[4])}"
+    )
     print(f"Following collected: {count_members(connection, collection[0], 'following')}")
     for relationship in ("followers", "following"):
         print(f"\n{relationship.title()} changes:")
@@ -117,9 +123,15 @@ def write_workbook(output, profile, collection, grouped, connection, avatar_diff
         ["Profile", profile],
         ["Collection timestamp", collection[1]],
         ["Status", "Complete" if collection[2] else "Partial"],
-        ["Followers shown by Instagram", collection[3] if collection[3] is not None else "Unknown"],
+        [
+            "Followers shown by Instagram",
+            verified_header_total(connection, collection[0], "followers", collection[3]),
+        ],
         ["Followers collected", count_members(connection, collection[0], "followers")],
-        ["Following shown by Instagram", collection[4] if collection[4] is not None else "Unknown"],
+        [
+            "Following shown by Instagram",
+            verified_header_total(connection, collection[0], "following", collection[4]),
+        ],
         ["Following collected", count_members(connection, collection[0], "following")],
         ["New followers", len(grouped["followers"]["added"])],
         ["Removed followers", len(grouped["followers"]["removed"])],
@@ -195,11 +207,89 @@ def write_workbook(output, profile, collection, grouped, connection, avatar_diff
         archive.writestr("xl/worksheets/sheet2.xml", sheet(change_rows, [28, 18, 18, 32]))
 
 
+def write_table_workbook(output, sheet_name, headers, rows):
+    if not headers:
+        raise ValueError("A table export requires at least one column.")
+    rows = [list(headers), *[list(row) for row in rows]]
+    safe_sheet_name = escape(str(sheet_name)[:31] or "IB Circlio")
+    content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>"""
+    workbook = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="{safe_sheet_name}" sheetId="1" r:id="rId1"/></sheets></workbook>"""
+    root_relationships = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"""
+    workbook_relationships = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>"""
+    styles = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>
+<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF18864B"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>"""
+
+    def column_name(number):
+        name = ""
+        while number:
+            number, remainder = divmod(number - 1, 26)
+            name = chr(65 + remainder) + name
+        return name
+
+    xml_rows = []
+    for row_number, row in enumerate(rows, 1):
+        cells = []
+        for column, value in enumerate(row, 1):
+            reference = f"{column_name(column)}{row_number}"
+            style = 1 if row_number == 1 else 0
+            text = escape("" if value is None else str(value))
+            cells.append(
+                f'<c r="{reference}" t="inlineStr" s="{style}"><is><t xml:space="preserve">{text}</t></is></c>'
+            )
+        xml_rows.append(f'<row r="{row_number}">{"".join(cells)}</row>')
+    column_xml = "".join(
+        f'<col min="{index}" max="{index}" width="28" customWidth="1"/>'
+        for index in range(1, len(headers) + 1)
+    )
+    last_cell = f"{column_name(len(headers))}{len(rows)}"
+    worksheet = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f"<cols>{column_xml}</cols><sheetData>{''.join(xml_rows)}</sheetData>"
+        f'<autoFilter ref="A1:{last_cell}"/>'
+        "</worksheet>"
+    )
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("_rels/.rels", root_relationships)
+        archive.writestr("xl/workbook.xml", workbook)
+        archive.writestr("xl/_rels/workbook.xml.rels", workbook_relationships)
+        archive.writestr("xl/styles.xml", styles)
+        archive.writestr("xl/worksheets/sheet1.xml", worksheet)
+
+
 def count_members(connection, collection_id, relationship):
     return connection.execute(
         "SELECT COUNT(*) FROM collection_memberships WHERE collection_id = ? AND relationship = ?",
         (collection_id, relationship),
     ).fetchone()[0]
+
+
+def verified_header_total(connection, collection_id, relationship, reported_total):
+    if reported_total is None:
+        return "Unavailable"
+    if relationship == "following" and reported_total > 7500:
+        return "Unverified"
+    collected = count_members(connection, collection_id, relationship)
+    return reported_total if reported_total == collected else "Unverified"
 
 
 RELATIONSHIPS = ("followers", "following")
