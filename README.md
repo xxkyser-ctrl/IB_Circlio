@@ -10,6 +10,8 @@ The project combines a browser extension with a small Python service and a deskt
 
 [![Latest release](https://img.shields.io/github/v/release/xxkyser-ctrl/IB_Circlio)](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest)
 
+[Project website](https://xxkyser-ctrl.github.io/IB_Circlio/)
+
 ## Overview
 
 Instagram's current follower and following lists do not provide a personal, timestamped history of every account shown. IB_Circlio lets a user collect those lists periodically and compare saved snapshots, so a later report can show additions, removals, and the collection time at which each observed transition occurred.

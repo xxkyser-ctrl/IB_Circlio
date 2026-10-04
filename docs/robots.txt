@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://xxkyser-ctrl.github.io/IB_Circlio/sitemap.xml
