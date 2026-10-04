@@ -63,6 +63,8 @@ def main():
         "README.md",
         "RELEASE_NOTES.md",
         "SECURITY.md",
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md",
         "manifest.json",
         "manifest.firefox.json",
         "background.js",
@@ -73,6 +75,7 @@ def main():
     ):
         shutil.copy2(ROOT / filename, RELEASE_DIR / filename)
     shutil.copytree(ROOT / "icons", RELEASE_DIR / "icons")
+    shutil.copytree(ROOT / "vendor", RELEASE_DIR / "vendor")
     if (ROOT / "docs" / "screenshots").exists():
         shutil.copytree(
             ROOT / "docs" / "screenshots", RELEASE_DIR / "docs" / "screenshots"

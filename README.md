@@ -4,6 +4,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/xxkyser-ctrl/IB_Circlio)](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-3766A3)](#installation)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 IB Circlio collects the Followers and Following lists visible on a profile in your signed-in browser, saves timestamped snapshots to your PC, and helps you review changes and export reports. Collection history stays on your PC; IB Circlio has no cloud account or hosted data service. `IB_Circlio` is the repository and project-site identifier.
 
@@ -148,7 +149,7 @@ IB Circlio is an independent project and is not affiliated with, endorsed by, or
 
 ## License
 
-No `LICENSE` file is currently present in the repository, so no license grant is stated here.
+Released under the MIT License. See [LICENSE](LICENSE). Third-party software is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Links
 
