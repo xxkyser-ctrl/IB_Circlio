@@ -240,6 +240,7 @@ class CirclioReportApp:
         )
         self.server_process = None
         self.server_stopping = False
+        self.avatar_window = None
         self.server_messages = queue.Queue()
         self.server_status = tk.StringVar(value="Stopped")
         self.server_start_button = None
@@ -266,9 +267,10 @@ class CirclioReportApp:
         self.root.configure(background=BACKGROUND)
         icon = self.app_directory / "icons" / "ib-circlio.ico"
         if icon.is_file():
-            self.root.iconbitmap(default=str(icon))
+            self.root.iconbitmap(str(icon))
         self._configure_styles()
         self._build_layout()
+        self.root.bind_all("<Button-1>", self._close_avatar_on_app_click, add="+")
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
             launcher.prepare_local_config(
@@ -312,6 +314,28 @@ class CirclioReportApp:
             foreground="#ffffff", borderwidth=0
         )
         style.map("Accent.TButton", background=[("active", "#4053d4")])
+        style.configure(
+            "ServiceStart.TButton",
+            padding=(14, 9),
+            background="#18864b",
+            foreground="#ffffff",
+            borderwidth=0,
+        )
+        style.map(
+            "ServiceStart.TButton",
+            background=[("disabled", "#aab6ad"), ("active", "#126b3b")],
+        )
+        style.configure(
+            "ServiceStop.TButton",
+            padding=(14, 9),
+            background="#c44455",
+            foreground="#ffffff",
+            borderwidth=0,
+        )
+        style.map(
+            "ServiceStop.TButton",
+            background=[("disabled", "#c5b3b5"), ("active", "#a82f40")],
+        )
         style.configure("TCombobox", padding=7, fieldbackground=SURFACE)
         style.configure(
             "TNotebook", background=BACKGROUND, borderwidth=0, tabmargins=(0, 0, 0, 0)
@@ -426,12 +450,13 @@ class CirclioReportApp:
         self.server_start_button = ttk.Button(
             controls,
             text="Start service",
-            style="Accent.TButton",
+            style="ServiceStart.TButton",
             command=self._start_server,
         )
         self.server_start_button.pack(side="left")
         self.server_stop_button = ttk.Button(
-            controls, text="Stop service", command=self._stop_server, state="disabled"
+            controls, text="Stop service", style="ServiceStop.TButton",
+            command=self._stop_server, state="disabled"
         )
         self.server_stop_button.pack(side="left", padx=8)
         ttk.Button(
@@ -674,6 +699,12 @@ class CirclioReportApp:
             self.changes_tab, text="Changes from the previous complete snapshot.",
             style="Muted.TLabel"
         ).pack(anchor="w", pady=(3, 16))
+        self.changes_empty_label = ttk.Label(
+            self.changes_tab,
+            text="",
+            style="Muted.TLabel",
+        )
+        self.changes_empty_label.pack(anchor="w", pady=(0, 8))
         self.changes_tree = self._tree(
             self.changes_tab, ("relationship", "change", "username"),
             ("List", "Change", "Username"), (180, 180, 480), height=15,
@@ -922,6 +953,22 @@ class CirclioReportApp:
         label.image = photo
         label.pack(padx=18, pady=18)
         window.bind("<Escape>", lambda _event: window.destroy())
+        window.bind("<Destroy>", self._avatar_window_closed, add="+")
+        self.avatar_window = window
+
+    def _avatar_window_closed(self, event):
+        if event.widget is self.avatar_window:
+            self.avatar_window = None
+
+    def _close_avatar_on_app_click(self, event):
+        if not self.avatar_window:
+            return
+        try:
+            if event.widget.winfo_toplevel() is self.root:
+                self.avatar_window.destroy()
+                self.root.lift()
+        except tk.TclError:
+            self.avatar_window = None
 
     def _export_tree(self, tree):
         rows = []
@@ -947,7 +994,7 @@ class CirclioReportApp:
         if not output:
             return
         try:
-            result.write_table_workbook(Path(output), "IB Circlio", headers, rows)
+            result.write_table_workbook(Path(output), "IB_Circlio", headers, rows)
         except (OSError, ValueError, zipfile.BadZipFile) as error:
             return self._error(f"Could not export this table:\n{error}")
         messagebox.showinfo("Table exported", f"Saved Excel table to:\n{output}", parent=self.root)
@@ -1052,15 +1099,19 @@ class CirclioReportApp:
         self._clear_tree(self.changes_tree)
         collection = result.latest_collection(self.connection, self.profile.get())
         if not collection:
+            self.changes_empty_label.configure(
+                text="Collect a complete snapshot to see changes here."
+            )
             self._refresh_tree_search(self.changes_tree)
             return
         previous = result.previous_collection(self.connection, self.profile.get(), collection[0])
         if not previous:
-            self.changes_tree.insert(
-                "", "end", values=("—", "—", "A second complete snapshot is needed to compare.")
+            self.changes_empty_label.configure(
+                text="A second complete snapshot is needed to compare."
             )
             self._refresh_tree_search(self.changes_tree)
             return
+        self.changes_empty_label.configure(text="")
         changes = result.grouped_changes(self.connection, previous, collection)
         for relationship in result.RELATIONSHIPS:
             for change in ("added", "removed"):
@@ -1252,7 +1303,7 @@ class CirclioReportApp:
             )
         self._refresh_tree_search(self.compare_tree)
         self.root.title(
-            f"IB Circlio | {format_timestamp(before[1])} → {format_timestamp(after[1])}"
+            f"IB_Circlio | {format_timestamp(before[1])} → {format_timestamp(after[1])}"
         )
 
     def _avatar_path(self, collection_id, username):
@@ -1342,7 +1393,7 @@ class CirclioReportApp:
         messagebox.showinfo("Excel report created", f"Saved report to:\n{output}", parent=self.root)
 
     def _error(self, message):
-        messagebox.showerror("IB Circlio", message, parent=self.root)
+        messagebox.showerror("IB_Circlio", message, parent=self.root)
 
     def close(self):
         process = self.server_process

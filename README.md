@@ -26,7 +26,7 @@ Each collection is an observation, not a live connection to Instagram. A first c
 
 ## Key features
 
-- **Collect both lists in one run.** The extension opens and scans the profile's Followers and Following dialogs, scrolling to discover usernames the page loads as it goes.
+- **Collect both lists in one run.** The extension opens and scans the profile's Followers and Following dialogs, waits at least one second for each dialog to stabilize, and scrolls to discover usernames the page loads as it goes.
 - **Keep a local, timestamped history.** Complete and partial snapshots are saved in a SQLite database on the PC. Usernames are normalized and de-duplicated within each list.
 - **See follower and following changes.** Compare snapshots to find accounts added to or removed from each relationship list.
 - **Trace changes between any two snapshots.** The comparison view can show every recorded transition between an older **From** snapshot and a newer **To** snapshot, including an account that left and later returned.
@@ -98,12 +98,10 @@ IB_Circlio/
 ├── result_gui.py              # Tkinter desktop reports
 ├── result.py                  # Command-line reports and Excel workbook writer
 ├── launcher.py                # Creates the local token and extension config
-├── run_server.bat             # Compatibility launcher for the unified app
-├── result.bat                 # Opens the unified app and report views
-├── build_release.py            # Builds isolated, versioned Windows release outputs
+├── ib_circlio.bat             # Single source-mode launcher for the unified app
 ├── clear_database.bat         # Starts the local data-reset utility
 ├── clear_database.py          # Password-confirmed database and avatar reset
-├── build_release.py            # Builds portable Windows executables and release folder
+├── build_release.py           # Builds isolated, versioned Windows release outputs
 ├── requirements-build.txt      # Python packaging and image-library dependencies
 ├── config.template.js          # Manual configuration template (placeholder token)
 ├── SECURITY.md                # Security model and release checklist
@@ -112,7 +110,7 @@ IB_Circlio/
 └── icons/                      # Extension and Windows application icons
 ```
 
-The root directory is the extension source folder. `build/`, `dist/`, and `release/` are packaging outputs rather than required runtime source directories.
+The root directory is the extension source folder. The portable release includes one user-facing launcher, `ib_circlio.exe`, plus supporting service and database-reset executables. `build/`, `dist/`, and `release/` are packaging outputs rather than required runtime source directories.
 
 ## Installation
 
@@ -128,10 +126,10 @@ The portable release includes the extension source files and Windows executables
    - Opera: `opera://extensions`
    - Vivaldi: `vivaldi://extensions`
 3. Enable **Developer mode**, select **Load unpacked**, and choose the extracted release folder.
-4. Double-click `run_server.bat` or `result.bat` to open the IB_Circlio desktop application. The app creates the local data directory, token, and extension configuration. In its **Collection service** tab, select **Start service** and confirm the status changes to **Running**.
+4. Double-click `ib_circlio.exe` to open the IB_Circlio desktop application. The app creates the local data directory, token, and extension configuration. In its **Collection service** tab, select the green **Start service** button and confirm the status changes to **Running**.
 5. Sign in to Instagram normally, open the profile whose lists you want to collect, and click the IB_Circlio extension.
 6. Select **Start collection**. The extension reads Followers and Following in sequence and reports when the snapshot is saved.
-7. Return to the same IB_Circlio window and select **Refresh reports** to browse, compare, search, and export saved collections. The collection service and reporting tools are part of this one application.
+7. Return to the same IB_Circlio window and select **Refresh reports** to browse, compare, search, and export saved collections. Select the red **Stop service** button when finished; closing the app also stops its service.
 
 The repository includes a Firefox-specific manifest. Firefox extension origins are not included in the local service's current explicit origin allowlist; therefore, end-to-end Firefox collection is not documented as a supported workflow. The Chromium-based browsers above use the standard manifest and are the intended installation path.
 
@@ -155,10 +153,10 @@ py -3 -m pip install -r requirements-build.txt
 The source folder can be loaded as an unpacked browser extension. Open the integrated desktop application from the source folder:
 
 ```powershell
-.\run_server.bat
+.\ib_circlio.bat
 ```
 
-The batch file starts the unified interface, which can start the local service and show its status and logs. It uses the packaged executables when present and otherwise uses Python source scripts. To run the interface directly from source:
+The single launcher starts the unified interface, which can start the local service and show its status and logs. It uses the packaged executable when present and otherwise uses Python source scripts. To run the interface directly from source:
 
 ```powershell
 py -3 result_gui.py --data-dir "$env:USERPROFILE\Desktop\Instagram Exporter Data"
@@ -176,7 +174,7 @@ To build the portable Windows package from source:
 py -3 -B build_release.py
 ```
 
-The build script requires Windows and the packages in `requirements-build.txt`. It creates version-specific build files under `build/IB Circlio-1.0.4-windows/` and the portable app under `release/IB Circlio-1.0.4-windows/` without deleting other release or build output.
+The build script requires Windows and the packages in `requirements-build.txt`. It creates version-specific build files under `build/IB Circlio-1.0.5-windows/` and the portable app under `release/IB Circlio-1.0.5-windows/` without deleting other release or build output.
 
 ## Environment variables and configuration
 
@@ -196,12 +194,12 @@ For manual development configuration, `config.template.js` shows the required Ja
 
 For normal use, open the integrated application:
 
-1. Start `run_server.bat` or `result.bat`. Both open the same IB_Circlio desktop application.
-2. Open the **Collection service** tab and select **Start service**. The status and service output are shown in the application.
+1. Start `ib_circlio.exe` from a portable release, or `ib_circlio.bat` from the source folder.
+2. Open the **Collection service** tab and select the green **Start service** button. The status and service output are shown in the application.
 3. Open Instagram and use the extension to collect a profile.
-4. Return to the desktop application and select **Refresh reports**, then browse, compare, and export using the existing report tabs.
+4. Return to the desktop application and select **Refresh reports**, then browse, compare, and export using the existing report tabs. The red **Stop service** button stops the backend; closing the app stops it as well.
 
-Select **Stop service** in the application when collection is finished. Closing the application also stops the service it started. Avoid running a second service instance against the same data directory.
+Select the red **Stop service** button in the application when collection is finished. Closing the application also stops the service it started. Avoid running a second service instance against the same data directory.
 
 ## Usage
 
@@ -295,7 +293,7 @@ The repository contains redacted screenshots of the extension, collection progre
 - **Database and pictures:** stored beneath `%USERPROFILE%\Desktop\Instagram Exporter Data` by default.
 - **Server authentication:** the desktop application creates a random token locally and writes the extension configuration to the ignored `config.js`.
 - **Service address:** the local service binds to `127.0.0.1:8765` by default.
-- **Alternate data directory:** `result.bat`, `result_gui.py`, `server.py`, and related scripts accept command-line paths for source/development workflows; the packaged batch files use the default Windows data directory.
+- **Alternate data directory:** `ib_circlio.bat`, `result_gui.py`, `server.py`, and related scripts accept command-line paths for source/development workflows; the portable executable uses the default Windows data directory.
 - **Data reset:** `clear_database.bat` starts the password-confirmed utility. It requires confirmation by typing `CLEAR` before permanently clearing profiles, snapshots, changes, and archived pictures.
 
 ## Deployment
@@ -304,7 +302,7 @@ IB_Circlio is designed to run locally on Windows. The repository contains a Wind
 
 ## Troubleshooting
 
-- **The extension reports that it cannot reach the database:** open the IB_Circlio application, select **Start service**, and confirm the status is **Running**. Confirm that the extension was loaded from the extracted folder and that its local configuration was created.
+- **The extension reports that it cannot reach the database:** open the IB_Circlio application, select the green **Start service** button, and confirm the status is **Running**. Confirm that the extension was loaded from the extracted folder and that its local configuration was created.
 - **The extension does not respond on an Instagram tab that was already open:** reload the Instagram tab after installing or updating the extension.
 - **The extension reports that a list dialog did not open:** open a profile page, allow it to finish rendering, and try again. If necessary, open the Followers or Following count once manually and retry.
 - **A collection is partial or appears short:** Instagram loads list content dynamically and may rate-limit or change its page markup. Keep the tab open during collection and retry later. Partial collections are saved for inspection but excluded from complete-snapshot comparisons.

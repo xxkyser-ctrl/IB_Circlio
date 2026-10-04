@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 RELEASE_NAME = f"IB Circlio-{VERSION}-windows"
 BUILD_DIR = ROOT / "build" / RELEASE_NAME
 DIST_DIR = BUILD_DIR / "dist"
@@ -51,17 +51,13 @@ def main():
     DIST_DIR.mkdir(parents=True)
     RELEASE_DIR.mkdir(parents=True)
     for script, name in (
-        ("launcher.py", "ib-circlio-launcher"),
         ("server.py", "ib-circlio-server"),
-        ("result.py", "ib-circlio-result"),
-        ("result_gui.py", "ib-circlio-report"),
+        ("result_gui.py", "ib_circlio"),
         ("clear_database.py", "ib-circlio-clear-database"),
     ):
         run_pyinstaller(script, name, windowed=(script == "result_gui.py"))
         shutil.copy2(DIST_DIR / f"{name}.exe", RELEASE_DIR / f"{name}.exe")
     for filename in (
-        "run_server.bat",
-        "result.bat",
         "result_gui.py",
         "clear_database.bat",
         "README.md",

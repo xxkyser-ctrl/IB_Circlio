@@ -32,4 +32,4 @@ Do not publish database files, tokens, screenshots containing usernames, or expo
 - Verify unauthenticated data requests return `401`.
 - Verify requests with a non-extension `Origin` return `403`.
 - Verify profiles remain isolated.
-- Stop the local service from the desktop application's Collection service tab when the extension is not in use.
+- Stop the local service using the red Stop service button or close the desktop application when the extension is not in use.

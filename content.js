@@ -234,11 +234,32 @@
     for (let attempt = 0; attempt < 30; attempt += 1) {
       await sleep(250);
       if (findDialog()) {
-        await sleep(500);
+        await waitForDialogToStabilize(listType);
         return;
       }
     }
     throw new Error(`The ${listType} dialog did not open. Click the profile's ${listType} count once, then try again.`);
+  }
+
+  async function waitForDialogToStabilize(listType) {
+    const startedAt = Date.now();
+    let previousSignature = null;
+    let stablePolls = 0;
+    sendCollectionState(true, `Waiting for ${listType} list to finish loading...`);
+    while (Date.now() - startedAt < 5000) {
+      const dialog = findDialog();
+      if (!dialog) throw new Error(`${listType} dialog closed while loading.`);
+      const signature = [
+        dialog.querySelectorAll("a[href]").length,
+        dialog.scrollHeight,
+        dialog.textContent.length
+      ].join(":");
+      if (signature === previousSignature) stablePolls += 1;
+      else stablePolls = 0;
+      if (Date.now() - startedAt >= 1000 && stablePolls >= 2) return;
+      previousSignature = signature;
+      await sleep(250);
+    }
   }
 
   async function collectProfile() {
