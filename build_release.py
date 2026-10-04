@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 RELEASE_NAME = f"IB Circlio-{VERSION}-windows"
 BUILD_DIR = ROOT / "build" / RELEASE_NAME
 DIST_DIR = BUILD_DIR / "dist"
@@ -73,8 +73,10 @@ def main():
     ):
         shutil.copy2(ROOT / filename, RELEASE_DIR / filename)
     shutil.copytree(ROOT / "icons", RELEASE_DIR / "icons")
-    if (ROOT / "docs" / "images").exists():
-        shutil.copytree(ROOT / "docs" / "images", RELEASE_DIR / "docs" / "images")
+    if (ROOT / "docs" / "screenshots").exists():
+        shutil.copytree(
+            ROOT / "docs" / "screenshots", RELEASE_DIR / "docs" / "screenshots"
+        )
     print(f"Portable release created at: {RELEASE_DIR}")
 
 

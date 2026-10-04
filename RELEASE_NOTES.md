@@ -1,15 +1,11 @@
-# IB_Circlio v1.0.5
+# IB_Circlio v1.0.6
 
 ## What's new
 
-- Use one launcher named `ib_circlio`: the portable release provides `ib_circlio.exe`; source mode provides `ib_circlio.bat`.
-- Show the service start action in green and the stop action in red.
-- Close the avatar preview by clicking back into the main application.
-- Wait at least one second for each Instagram list dialog to stabilize before collecting usernames.
-- Keep the Changes table empty when a second complete snapshot is not yet available instead of adding an explanatory message as a data row.
-- Apply the IB_Circlio icon to the application window and packaged executable.
-- Stop the local collection service when the application closes.
-- Build into a version-specific output folder without replacing earlier releases.
+- Refresh report views automatically when a collection is saved while the local service is running. Manual **Refresh reports** remains available.
+- Set a stable Windows app identity and use the IB_Circlio logo for the application window and taskbar.
+- Replace the older documentation screenshots with updated, privacy-redacted collection and report screens.
+- Keep the versioned portable release and browser extension manifests in sync at v1.0.6.
 
 ## Included
 
@@ -22,11 +18,11 @@
 
 ## Install and use
 
-1. Download `IB-Circlio-1.0.5-windows.zip` from the [GitHub v1.0.5 release](https://github.com/xxkyser-ctrl/IB_Circlio/releases/tag/v1.0.5).
+1. Download `IB-Circlio-1.0.6-windows.zip` from the [GitHub v1.0.6 release](https://github.com/xxkyser-ctrl/IB_Circlio/releases/tag/v1.0.6).
 2. Extract the archive to a normal folder and load that folder as an unpacked extension in a supported Chromium-based browser.
 3. Double-click the single application, `ib_circlio.exe`.
 4. Select the green **Start service** button and wait for the status to show **Running**.
 5. Open an Instagram profile and start a collection from the extension.
-6. Return to the same app and select **Refresh reports**. Select the red **Stop service** button when finished; closing the app also stops the service.
+6. Reports refresh automatically while the service is running. Select the red **Stop service** button when finished; closing the app also stops the service.
 
 The database, token, and archived profile pictures are stored on the PC under `Desktop\Instagram Exporter Data` by default. See [README.md](README.md) for complete setup, usage, and limitations.

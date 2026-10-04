@@ -1,11 +1,13 @@
 """Desktop interface for browsing local IB Circlio reports."""
 
 import argparse
+import ctypes
 import queue
 import sqlite3
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 import zipfile
 from datetime import date, datetime
@@ -27,6 +29,26 @@ ACCENT = "#5265e8"
 GREEN = "#12805c"
 RED = "#c44455"
 SIDEBAR = "#17213a"
+REPORT_REFRESH_CHECK_SECONDS = 1
+WINDOWS_APP_ID = "IBCirclio.Desktop"
+
+
+def database_data_version(connection):
+    """Return SQLite's version counter for commits made by other connections."""
+    return int(connection.execute("PRAGMA data_version").fetchone()[0])
+
+
+def set_windows_app_user_model_id():
+    if sys.platform != "win32":
+        return
+    result_code = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+        WINDOWS_APP_ID
+    )
+    if result_code:
+        raise OSError(
+            f"Could not set the Windows taskbar application identity "
+            f"(HRESULT {result_code:#x})."
+        )
 
 
 def compare_members(connection, profile, from_snapshot, to_snapshot, relationships):
@@ -240,6 +262,8 @@ class CirclioReportApp:
         )
         self.server_process = None
         self.server_stopping = False
+        self.last_database_version = database_data_version(connection)
+        self.next_report_check = 0.0
         self.avatar_window = None
         self.server_messages = queue.Queue()
         self.server_status = tk.StringVar(value="Stopped")
@@ -268,6 +292,10 @@ class CirclioReportApp:
         icon = self.app_directory / "icons" / "ib-circlio.ico"
         if icon.is_file():
             self.root.iconbitmap(str(icon))
+        png_icon = self.app_directory / "icons" / "ib-128.png"
+        self.app_icon = tk.PhotoImage(file=str(png_icon)) if png_icon.is_file() else None
+        if self.app_icon is not None:
+            self.root.iconphoto(True, self.app_icon)
         self._configure_styles()
         self._build_layout()
         self.root.bind_all("<Button-1>", self._close_avatar_on_app_click, add="+")
@@ -284,6 +312,7 @@ class CirclioReportApp:
             self.notebook.select(self.snapshot_tab)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.after(200, self._poll_server)
+        self.root.after(1000, self._poll_reports)
 
     def _profiles(self):
         return [
@@ -608,6 +637,30 @@ class CirclioReportApp:
             self.server_process = None
             self.server_stopping = False
         self.root.after(200, self._poll_server)
+
+    def _poll_reports(self):
+        process = self.server_process
+        now = time.monotonic()
+        if (
+            process is not None
+            and process.poll() is None
+            and now >= self.next_report_check
+        ):
+            self.next_report_check = now + REPORT_REFRESH_CHECK_SECONDS
+            try:
+                current_version = database_data_version(self.connection)
+            except sqlite3.Error as error:
+                self._append_server_log(f"Could not check for report updates: {error}")
+            else:
+                if current_version != self.last_database_version:
+                    try:
+                        self.refresh()
+                    except sqlite3.Error as error:
+                        self._append_server_log(f"Could not refresh reports: {error}")
+                    else:
+                        self.last_database_version = current_version
+        self.root.after(1000, self._poll_reports)
+
     def _build_dashboard(self):
         tab = self.dashboard_tab
         ttk.Label(tab, text="At a glance", style="Section.TLabel").pack(anchor="w")
@@ -1423,6 +1476,14 @@ def main():
     )
     args = parser.parse_args()
     data_dir = Path(args.data_dir).expanduser()
+    try:
+        set_windows_app_user_model_id()
+    except OSError as error:
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("IB_Circlio could not start", str(error), parent=root)
+        root.destroy()
+        return
     database_path = data_dir / "instagram.db"
     root = tk.Tk()
     try:

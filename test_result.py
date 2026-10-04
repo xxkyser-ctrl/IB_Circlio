@@ -1,5 +1,6 @@
 import contextlib
 import io
+import sqlite3
 import tempfile
 import unittest
 import zipfile
@@ -98,6 +99,17 @@ class SnapshotReportTests(unittest.TestCase):
                 self.database.connection, "owner", "2026-09-19", "2026-09-18",
                 result.RELATIONSHIPS,
             )
+
+    def test_database_data_version_detects_service_commits(self):
+        database_path = Path(self.directory.name) / "instagram.db"
+        reader = sqlite3.connect(database_path)
+        try:
+            initial_version = result_gui.database_data_version(reader)
+            self.save("2026-09-18T10:00:00+00:00", ["alice"], ["x"])
+            updated_version = result_gui.database_data_version(reader)
+            self.assertGreater(updated_version, initial_version)
+        finally:
+            reader.close()
 
     def test_gui_count_audit_reports_header_delta(self):
         collection = self.database.save_collection({

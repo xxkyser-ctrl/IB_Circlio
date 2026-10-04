@@ -33,6 +33,7 @@ Each collection is an observation, not a live connection to Instagram. A first c
 - **Browse and search saved lists.** View Followers, Following, or Both for a snapshot. Search fields filter table rows without changing the saved data.
 - **Review profile-picture history.** When a usable image URL is visible, IB_Circlio downloads a local copy for that collection. The report can display archived pictures, open an available picture at a larger size, and identify changed image URLs between collections.
 - **Export Excel workbooks and table views.** Create a formatted `.xlsx` report for a snapshot or export the currently displayed rows of an individual report table.
+- **Refresh reports automatically.** While the local collection service is running, the desktop app detects saved database changes and updates the report views; manual refresh is still available.
 - **Check collection totals.** The report distinguishes the number of usernames actually saved from Instagram's displayed header totals. A displayed total is marked unverified when it cannot be validated against the collected list.
 - **Review multiple profiles.** Collections are grouped by the Instagram profile whose list was collected.
 
@@ -106,7 +107,7 @@ IB_Circlio/
 ├── config.template.js          # Manual configuration template (placeholder token)
 ├── SECURITY.md                # Security model and release checklist
 ├── RELEASE_NOTES.md           # Current release notes
-├── docs/images/               # Redacted application and workflow screenshots
+├── docs/screenshots/          # Privacy-redacted application and workflow screenshots
 └── icons/                      # Extension and Windows application icons
 ```
 
@@ -129,7 +130,7 @@ The portable release includes the extension source files and Windows executables
 4. Double-click `ib_circlio.exe` to open the IB_Circlio desktop application. The app creates the local data directory, token, and extension configuration. In its **Collection service** tab, select the green **Start service** button and confirm the status changes to **Running**.
 5. Sign in to Instagram normally, open the profile whose lists you want to collect, and click the IB_Circlio extension.
 6. Select **Start collection**. The extension reads Followers and Following in sequence and reports when the snapshot is saved.
-7. Return to the same IB_Circlio window and select **Refresh reports** to browse, compare, search, and export saved collections. Select the red **Stop service** button when finished; closing the app also stops its service.
+7. Return to the same IB_Circlio window to browse, compare, search, and export saved collections. Reports refresh automatically while the service is running; **Refresh reports** remains available for a manual reload. Select the red **Stop service** button when finished; closing the app also stops its service.
 
 The repository includes a Firefox-specific manifest. Firefox extension origins are not included in the local service's current explicit origin allowlist; therefore, end-to-end Firefox collection is not documented as a supported workflow. The Chromium-based browsers above use the standard manifest and are the intended installation path.
 
@@ -174,7 +175,7 @@ To build the portable Windows package from source:
 py -3 -B build_release.py
 ```
 
-The build script requires Windows and the packages in `requirements-build.txt`. It creates version-specific build files under `build/IB Circlio-1.0.5-windows/` and the portable app under `release/IB Circlio-1.0.5-windows/` without deleting other release or build output.
+The build script requires Windows and the packages in `requirements-build.txt`. It creates version-specific build files under `build/IB Circlio-1.0.6-windows/` and the portable app under `release/IB Circlio-1.0.6-windows/` without deleting other release or build output.
 
 ## Environment variables and configuration
 
@@ -197,7 +198,7 @@ For normal use, open the integrated application:
 1. Start `ib_circlio.exe` from a portable release, or `ib_circlio.bat` from the source folder.
 2. Open the **Collection service** tab and select the green **Start service** button. The status and service output are shown in the application.
 3. Open Instagram and use the extension to collect a profile.
-4. Return to the desktop application and select **Refresh reports**, then browse, compare, and export using the existing report tabs. The red **Stop service** button stops the backend; closing the app stops it as well.
+4. Return to the desktop application to browse, compare, and export using the report tabs. Reports refresh automatically while the service runs; use **Refresh reports** for a manual reload. The red **Stop service** button stops the backend; closing the app stops it as well.
 
 Select the red **Stop service** button in the application when collection is finished. Closing the application also stops the service it started. Avoid running a second service instance against the same data directory.
 
@@ -274,19 +275,27 @@ Each profile can have many collections. A collection records its memberships thr
 
 ## Screenshots and demo
 
-The repository contains redacted screenshots of the extension, collection progress, local service, and comparison report:
+The repository contains privacy-redacted screenshots of collection and the report tabs. Usernames, profile photos, and surrounding browser content are obscured or omitted:
 
-![IB_Circlio extension ready to start a collection](docs/images/demo-start.png)
+![IB_Circlio collecting Instagram followers](docs/screenshots/demo-followers.png)
 
-![IB_Circlio collecting Instagram followers](docs/images/demo-followers.png)
+![IB_Circlio collecting Instagram following](docs/screenshots/demo-following.png)
 
-![IB_Circlio collecting Instagram following](docs/images/demo-following.png)
+![IB_Circlio showing that follower and following lists were saved](docs/screenshots/demo-finished.png)
 
-![IB_Circlio collection finished](docs/images/demo-finished.png)
+![IB_Circlio collection service running in the desktop app](docs/screenshots/demo-service.png)
 
-![IB_Circlio local SQLite service](docs/images/demo-server.png)
+![IB_Circlio overview report](docs/screenshots/demo-overview.png)
 
-![IB_Circlio timestamped comparison report](docs/images/demo-result.png)
+![IB_Circlio snapshot report](docs/screenshots/demo-snapshot.png)
+
+![IB_Circlio browse list report](docs/screenshots/demo-browse.png)
+
+![IB_Circlio Excel export report](docs/screenshots/demo-export.png)
+
+![IB_Circlio snapshot comparison report](docs/screenshots/demo-compare.png)
+
+![IB_Circlio empty changes view before a second snapshot](docs/screenshots/demo-changes.png)
 
 ## Configuration
 
