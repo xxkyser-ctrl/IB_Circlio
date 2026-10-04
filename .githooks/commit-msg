@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+message_file=${1:?commit message file is required}
+temporary_file="${message_file}.copilot-clean.$$"
+trap 'rm -f "$temporary_file"' EXIT HUP INT TERM
+
+awk '
+  tolower($0) ~ /^[[:space:]]*co-authored-by:/ && tolower($0) ~ /copilot/ {
+    next
+  }
+  { print }
+' "$message_file" > "$temporary_file"
+
+cat "$temporary_file" > "$message_file"
