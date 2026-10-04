@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+for variable in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+  identity=$(git var "$variable")
+  normalized_identity=$(printf '%s' "$identity" | tr '[:upper:]' '[:lower:]')
+  case "$normalized_identity" in
+    *copilot*)
+      printf '%s\n' "Refusing commit: $variable contains a Copilot identity." >&2
+      exit 1
+      ;;
+  esac
+done
