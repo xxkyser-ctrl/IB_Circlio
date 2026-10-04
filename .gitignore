@@ -3,6 +3,7 @@ instagram.db
 *.db-shm
 *.db-wal
 __pycache__/
+*.py[cod]
 config.js
 *.xlsx
 build/
@@ -10,6 +11,3 @@ dist/
 release/
 *.zip
 clear-password.txt
-
-__pycache__/
-*.pyc

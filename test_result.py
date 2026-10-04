@@ -216,6 +216,37 @@ class SnapshotReportTests(unittest.TestCase):
         self.assertEqual(membership["following_only"], "[>] Following only")
         self.assertEqual(len({username for _, username, _ in rows}), 3)
 
+    def test_browse_membership_filter_separates_one_way_and_mutual_relationships(self):
+        collection = self.database.save_collection({
+            "profile": "owner",
+            "followers": ["shared", "follower_only"],
+            "following": ["shared", "following_only"],
+        })
+        rows = result_gui.browse_members(
+            self.database.connection, collection["id"], "both"
+        )
+        self.assertEqual(
+            [username for _, username, _ in result_gui.filter_browse_members(
+                rows, "Follows profile only"
+            )],
+            ["follower_only"],
+        )
+        self.assertEqual(
+            [username for _, username, _ in result_gui.filter_browse_members(
+                rows, "Profile follows only"
+            )],
+            ["following_only"],
+        )
+        self.assertEqual(
+            [username for _, username, _ in result_gui.filter_browse_members(
+                rows, "Mutual follows"
+            )],
+            ["shared"],
+        )
+        self.assertEqual(
+            result_gui.filter_browse_members(rows, "Everyone"), rows
+        )
+
     def test_browse_single_relationship_marks_rows(self):
         collection = self.database.save_collection({
             "profile": "owner",

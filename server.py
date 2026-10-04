@@ -444,7 +444,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"ok": False, "error": "Not found"})
         except ValueError as error:
             self.send_json(400, {"ok": False, "error": str(error)})
-        except Exception:
+        except Exception as error:
+            print(f"GET {parsed.path} failed: {error}", flush=True)
             self.send_json(500, {"ok": False, "error": "Internal server error"})
 
     def do_POST(self):
@@ -464,7 +465,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(201, {"ok": True, "collection": collection})
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             self.send_json(400, {"ok": False, "error": str(error)})
-        except Exception:
+        except Exception as error:
+            print(f"POST {request_path} failed: {error}", flush=True)
             self.send_json(500, {"ok": False, "error": "Internal server error"})
 
     def do_DELETE(self):
@@ -488,7 +490,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"ok": True, "profile": profile})
         except ValueError as error:
             self.send_json(400, {"ok": False, "error": str(error)})
-        except Exception:
+        except Exception as error:
+            print(f"DELETE {parsed.path} failed: {error}", flush=True)
             self.send_json(500, {"ok": False, "error": "Internal server error"})
 
 
@@ -513,7 +516,10 @@ def main():
     Handler.db = database
     Handler.token = token
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Instagram Exporter backend listening on http://127.0.0.1:{args.port}")
+    print(
+        f"IB_Circlio collection service listening on http://127.0.0.1:{args.port}",
+        flush=True,
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

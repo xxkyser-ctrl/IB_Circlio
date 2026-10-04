@@ -3,7 +3,25 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import launcher
 import server
+
+
+class LocalConfigTests(unittest.TestCase):
+    def test_local_config_reuses_token_and_uses_loopback_service(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data_dir = Path(directory) / "data"
+            config_path = Path(directory) / "config.js"
+            token_path = launcher.prepare_local_config(data_dir, config_path)
+            token = token_path.read_text(encoding="utf-8").strip()
+            self.assertGreaterEqual(len(token), 32)
+            self.assertIn('API_BASE = "http://127.0.0.1:8765"', config_path.read_text(
+                encoding="utf-8"
+            ))
+            self.assertEqual(
+                launcher.prepare_local_config(data_dir, config_path), token_path
+            )
+            self.assertEqual(token_path.read_text(encoding="utf-8").strip(), token)
 
 
 class AvatarCollectionTests(unittest.TestCase):

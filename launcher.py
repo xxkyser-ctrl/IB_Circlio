@@ -5,13 +5,8 @@ import secrets
 from pathlib import Path
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data-dir", required=True)
-    parser.add_argument("--config", required=True)
-    args = parser.parse_args()
-
-    data_dir = Path(args.data_dir)
+def prepare_local_config(data_dir, config_path):
+    data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     token_path = data_dir / "server-token.txt"
     token = token_path.read_text(encoding="utf-8").strip() if token_path.exists() else ""
@@ -24,7 +19,16 @@ def main():
         'globalThis.INSTAGRAM_EXPORTER_API_BASE = "http://127.0.0.1:8765";\n'
         f'globalThis.INSTAGRAM_EXPORTER_TOKEN = "{token}";\n'
     )
-    Path(args.config).write_text(config, encoding="utf-8")
+    Path(config_path).write_text(config, encoding="utf-8")
+    return token_path
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data-dir", required=True)
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args()
+    prepare_local_config(args.data_dir, args.config)
 
 
 if __name__ == "__main__":

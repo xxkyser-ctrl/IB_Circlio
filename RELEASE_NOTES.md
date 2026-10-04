@@ -1,32 +1,30 @@
-# IB Circlio v1.0.3
-
-IB Circlio is a privacy-first Instagram follower and following tracker for Windows.
+# IB_Circlio v1.0.4
 
 ## What's new
 
-- Search every report table by username with case-insensitive matching.
-- Compare snapshots with a timestamp for every membership transition, including accounts that leave and return.
-- Filter Browse lists by follower/following membership and see the membership colors.
-- Export visible table rows to Excel without replacing the full snapshot workbook export.
-- Open archived profile pictures in a larger view and use the closest available image from that snapshot or an earlier one.
-- Collect and archive more profile pictures when Instagram exposes the image in the account's list row.
-- Reject unreliable Instagram totals and show collected username counts instead.
-- Use the updated, searchable report interface without a command window.
+- Start and stop the local collection service directly from the IB_Circlio desktop application.
+- View service status and live startup/error output in the Collection service tab.
+- Keep the existing overview, snapshot reports, changes, Browse, Compare, and Excel export views in that same application.
+- Filter a combined Browse list to accounts that follow the selected profile only, accounts the profile follows only, or mutual follows.
+- Refresh report data after a collection without closing or reopening the application.
+- Launch the same integrated application with either `result.bat` or the compatibility `run_server.bat` script.
+- Keep existing build and release folders when creating a versioned release build.
 
 ## Included
 
-- Automatic Followers and Following collection
-- PC-local SQLite snapshots and dated profile-picture archive
-- New follower, unfollower, and following change history
-- Chrome, Edge, Brave, Opera, Vivaldi, and Firefox extension manifests
-- Portable Windows executables; Python is not required for end users
+- Chromium browser extension for collecting visible Instagram Followers and Following lists.
+- Local Python service and SQLite snapshot history.
+- Windows desktop application for browsing, searching, comparing, and exporting saved collections.
+- Local profile-picture archive when Instagram exposes a downloadable image in a list row.
+- Portable Windows executables; Python is not required for normal use of the packaged release.
 
-## Install
+## Install and use
 
-1. Download `IB-Circlio-1.0.3-windows.zip`.
-2. Extract it to a normal folder and load that folder as an unpacked extension.
-3. Double-click `run_server.bat`.
-4. Open an Instagram profile and click **Start collection**.
-5. Open `result.bat` to search, compare, browse, and export local snapshots.
+1. Download `IB-Circlio-1.0.4-windows.zip` from the [GitHub v1.0.4 release](https://github.com/xxkyser-ctrl/IB_Circlio/releases/tag/v1.0.4).
+2. Extract the archive to a normal folder and load that folder as an unpacked extension in a supported Chromium-based browser.
+3. Double-click `result.bat` or `run_server.bat` to open the unified IB_Circlio application.
+4. In **Collection service**, select **Start service** and wait for the status to show **Running**.
+5. Open an Instagram profile and start a collection from the extension.
+6. Return to the application and select **Refresh reports** to see the saved snapshot.
 
-The local database and image archive are stored under `Desktop\Instagram Exporter Data`.
+The database, token, and archived profile pictures are stored on the PC under `Desktop\Instagram Exporter Data` by default. See [README.md](README.md) for installation, supported-browser details, usage, and limitations.

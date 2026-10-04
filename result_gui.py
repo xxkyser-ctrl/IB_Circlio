@@ -1,17 +1,22 @@
 """Desktop interface for browsing local IB Circlio reports."""
 
 import argparse
+import queue
 import sqlite3
+import subprocess
 import sys
+import threading
 import tkinter as tk
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from PIL import Image, ImageDraw, ImageOps, ImageTk, UnidentifiedImageError
 
+import launcher
 import result
+import server
 
 
 BACKGROUND = "#f3f5f9"
@@ -74,6 +79,19 @@ def browse_members(connection, collection_id, relationship_choice):
         )
         rows.append((marker, username, avatar_path))
     return rows
+
+
+def filter_browse_members(rows, membership_filter):
+    """Filter combined-list rows by which direction of the relationship applies."""
+    markers = {
+        "follows profile only": "[F] Followers only",
+        "profile follows only": "[>] Following only",
+        "mutual follows": "[=] Both",
+    }
+    marker = markers.get(membership_filter.casefold())
+    if marker is None:
+        return rows
+    return [row for row in rows if row[0] == marker]
 
 
 def comparison_timeline(connection, profile, from_collection_id, to_collection_id, relationships):
@@ -211,9 +229,22 @@ def matching_tree_items(items, query):
 
 
 class CirclioReportApp:
-    def __init__(self, root, connection):
+    def __init__(self, root, connection, data_dir):
         self.root = root
         self.connection = connection
+        self.data_dir = Path(data_dir)
+        self.app_directory = (
+            Path(sys.executable).parent
+            if getattr(sys, "frozen", False)
+            else Path(__file__).resolve().parent
+        )
+        self.server_process = None
+        self.server_stopping = False
+        self.server_messages = queue.Queue()
+        self.server_status = tk.StringVar(value="Stopped")
+        self.server_start_button = None
+        self.server_stop_button = None
+        self.server_log_view = None
         self.profile_values = self._profiles()
         self.profile = tk.StringVar(value=self.profile_values[0] if self.profile_values else "")
         self.dates = []
@@ -229,20 +260,28 @@ class CirclioReportApp:
         self.tree_search_vars = {}
         self.tree_search_status = {}
         self.excel_icon = self._make_excel_icon()
-        self.root.title("IB Circlio | Reports")
-        self.root.geometry("1180x780")
-        self.root.minsize(940, 640)
+        self.root.title("IB_Circlio")
+        self.root.geometry("1240x840")
+        self.root.minsize(980, 680)
         self.root.configure(background=BACKGROUND)
-        app_directory = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
-        icon = app_directory / "icons" / "ib-circlio.ico"
+        icon = self.app_directory / "icons" / "ib-circlio.ico"
         if icon.is_file():
             self.root.iconbitmap(default=str(icon))
         self._configure_styles()
         self._build_layout()
+        try:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            launcher.prepare_local_config(
+                self.data_dir, self.app_directory / "config.js"
+            )
+        except OSError as error:
+            self._append_server_log(f"Could not prepare local configuration: {error}")
+            self.server_status.set("Configuration error")
         self.refresh()
         if self.snapshots:
             self.notebook.select(self.snapshot_tab)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.root.after(200, self._poll_server)
 
     def _profiles(self):
         return [
@@ -315,11 +354,11 @@ class CirclioReportApp:
             foreground="#9aa7c2", font=("Segoe UI", 8, "bold"), anchor="w"
         ).pack(fill="x", padx=25, pady=(0, 26))
         tk.Label(
-            sidebar, text="REPORTS", background=SIDEBAR, foreground="#8390aa",
+            sidebar, text="COLLECTIONS AND REPORTS", background=SIDEBAR, foreground="#8390aa",
             font=("Segoe UI", 8, "bold"), anchor="w"
         ).pack(fill="x", padx=24, pady=(0, 8))
         tk.Label(
-            sidebar, text="Snapshots, comparisons,\nand lists stay on this PC.",
+            sidebar, text="Start collection services,\nthen review local history.",
             background=SIDEBAR, foreground="#bac4d7", justify="left",
             font=("Segoe UI", 9)
         ).pack(side="bottom", anchor="w", padx=24, pady=22)
@@ -340,24 +379,210 @@ class CirclioReportApp:
 
         self.notebook = ttk.Notebook(content)
         self.notebook.pack(fill="both", expand=True, padx=30, pady=(12, 24))
+        self.service_tab = ttk.Frame(self.notebook, padding=22)
         self.dashboard_tab = ttk.Frame(self.notebook, padding=22)
         self.snapshot_tab = ttk.Frame(self.notebook, padding=22)
         self.changes_tab = ttk.Frame(self.notebook, padding=22)
         self.browse_tab = ttk.Frame(self.notebook, padding=22)
         self.compare_tab = ttk.Frame(self.notebook, padding=22)
         self.export_tab = ttk.Frame(self.notebook, padding=22)
+        self.notebook.add(self.service_tab, text="Collection service")
         self.notebook.add(self.dashboard_tab, text="Overview")
         self.notebook.add(self.snapshot_tab, text="Snapshot report")
         self.notebook.add(self.changes_tab, text="Changes")
         self.notebook.add(self.browse_tab, text="Browse lists")
         self.notebook.add(self.compare_tab, text="Compare")
         self.notebook.add(self.export_tab, text="Export")
+        self._build_service()
         self._build_dashboard()
         self._build_snapshot_report()
         self._build_changes()
         self._build_browse()
         self._build_compare()
         self._build_export()
+
+    def _build_service(self):
+        tab = self.service_tab
+        ttk.Label(tab, text="Instagram collection service", style="Section.TLabel").pack(
+            anchor="w"
+        )
+        ttk.Label(
+            tab,
+            text="Start or stop the local service used by the browser extension. "
+            "Keep it running while collecting.",
+            style="Muted.TLabel",
+            wraplength=850,
+        ).pack(anchor="w", pady=(4, 16))
+
+        controls = ttk.Frame(tab)
+        controls.pack(fill="x", pady=(0, 12))
+        ttk.Label(controls, text="Service status:", style="Section.TLabel").pack(
+            side="left"
+        )
+        self.server_status_label = ttk.Label(
+            controls, textvariable=self.server_status, style="Muted.TLabel"
+        )
+        self.server_status_label.pack(side="left", padx=(8, 18))
+        self.server_start_button = ttk.Button(
+            controls,
+            text="Start service",
+            style="Accent.TButton",
+            command=self._start_server,
+        )
+        self.server_start_button.pack(side="left")
+        self.server_stop_button = ttk.Button(
+            controls, text="Stop service", command=self._stop_server, state="disabled"
+        )
+        self.server_stop_button.pack(side="left", padx=8)
+        ttk.Button(
+            controls, text="Refresh reports", command=self.refresh
+        ).pack(side="right")
+
+        ttk.Label(tab, text="Service log", style="Section.TLabel").pack(
+            anchor="w", pady=(4, 8)
+        )
+        self.server_log_view = scrolledtext.ScrolledText(
+            tab,
+            height=22,
+            wrap="word",
+            background="#111827",
+            foreground="#d7e0ef",
+            insertbackground="#ffffff",
+            relief="flat",
+            font=("Consolas", 9),
+            state="disabled",
+        )
+        self.server_log_view.pack(fill="both", expand=True)
+        self._append_server_log(
+            "The local service is stopped. Select Start service before collecting."
+        )
+
+    def _append_server_log(self, message):
+        if self.server_log_view is None:
+            return
+        timestamp = datetime.now().astimezone().strftime("%H:%M:%S")
+        self.server_log_view.configure(state="normal")
+        self.server_log_view.insert("end", f"[{timestamp}] {message.rstrip()}\n")
+        line_count = int(self.server_log_view.index("end-1c").split(".")[0])
+        if line_count > 1000:
+            self.server_log_view.delete("1.0", f"{line_count - 1000}.0")
+        self.server_log_view.see("end")
+        self.server_log_view.configure(state="disabled")
+
+    def _start_server(self):
+        if self.server_process and self.server_process.poll() is None:
+            return
+        token_path = self.data_dir / "server-token.txt"
+        config_path = self.app_directory / "config.js"
+        try:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            launcher.prepare_local_config(self.data_dir, config_path)
+            packaged_server = self.app_directory / "ib-circlio-server.exe"
+            if packaged_server.is_file():
+                command = [
+                    str(packaged_server),
+                    "--db", str(self.data_dir / "instagram.db"),
+                    "--token-file", str(token_path),
+                ]
+            else:
+                python_executable = Path(sys.executable)
+                if python_executable.name.casefold() == "pythonw.exe":
+                    console_python = python_executable.with_name("python.exe")
+                    if console_python.is_file():
+                        python_executable = console_python
+                command = [
+                    str(python_executable),
+                    "-u",
+                    str(self.app_directory / "server.py"),
+                    "--db", str(self.data_dir / "instagram.db"),
+                    "--token-file", str(token_path),
+                ]
+            self.server_process = subprocess.Popen(
+                command,
+                cwd=str(self.app_directory),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except (OSError, ValueError) as error:
+            self.server_status.set("Start failed")
+            self._append_server_log(f"Could not start the local service: {error}")
+            return
+
+        process = self.server_process
+        self.server_status.set("Starting")
+        self.server_stopping = False
+        self.server_start_button.configure(state="disabled")
+        self.server_stop_button.configure(state="normal")
+        self._append_server_log("Starting the local service...")
+        threading.Thread(
+            target=self._read_server_output,
+            args=(process,),
+            daemon=True,
+            name="ib-circlio-service-log",
+        ).start()
+
+    def _read_server_output(self, process):
+        try:
+            if process.stdout:
+                for line in process.stdout:
+                    self.server_messages.put((process, line.rstrip()))
+        finally:
+            self.server_messages.put((process, None))
+
+    def _stop_server(self):
+        process = self.server_process
+        if process is None or process.poll() is not None:
+            self.server_status.set("Stopped")
+            self.server_start_button.configure(state="normal")
+            self.server_stop_button.configure(state="disabled")
+            return
+        self.server_status.set("Stopping")
+        self.server_stopping = True
+        self.server_stop_button.configure(state="disabled")
+        self._append_server_log("Stopping the local service...")
+        try:
+            process.terminate()
+        except OSError as error:
+            self.server_status.set("Stop failed")
+            self._append_server_log(f"Could not stop the local service: {error}")
+
+    def _poll_server(self):
+        while True:
+            try:
+                process, line = self.server_messages.get_nowait()
+            except queue.Empty:
+                break
+            if process is not self.server_process:
+                continue
+            if line is None:
+                continue
+            self._append_server_log(line)
+            if "listening on http://" in line:
+                self.server_status.set("Running")
+        process = self.server_process
+        if process is None:
+            self.server_start_button.configure(state="normal")
+            self.server_stop_button.configure(state="disabled")
+        elif process.poll() is not None:
+            return_code = process.returncode
+            if return_code and not self.server_stopping:
+                self.server_status.set(f"Stopped (exit {return_code})")
+                self._append_server_log(
+                    f"The local service exited with code {return_code}."
+                )
+            else:
+                self.server_status.set("Stopped")
+            self.server_start_button.configure(state="normal")
+            self.server_stop_button.configure(state="disabled")
+            self.server_process = None
+            self.server_stopping = False
+        self.root.after(200, self._poll_server)
     def _build_dashboard(self):
         tab = self.dashboard_tab
         ttk.Label(tab, text="At a glance", style="Section.TLabel").pack(anchor="w")
@@ -465,18 +690,46 @@ class CirclioReportApp:
         controls.pack(fill="x", pady=(0, 14))
         self.browse_date = tk.StringVar()
         self.browse_relationship = tk.StringVar(value="Followers")
+        self.browse_membership_filter = tk.StringVar(value="Everyone")
         ttk.Label(controls, text="Snapshot").pack(side="left", padx=(0, 8))
         self.browse_date_box = ttk.Combobox(
             controls, textvariable=self.browse_date, state="readonly", width=31
         )
         self.browse_date_box.pack(side="left")
         ttk.Label(controls, text="List").pack(side="left", padx=(18, 8))
-        ttk.Combobox(
+        self.browse_relationship_box = ttk.Combobox(
             controls, textvariable=self.browse_relationship, state="readonly",
             values=("Followers", "Following", "Both"), width=14
-        ).pack(side="left")
+        )
+        self.browse_relationship_box.pack(side="left")
+        ttk.Label(controls, text="Show").pack(side="left", padx=(18, 8))
+        self.browse_filter_box = ttk.Combobox(
+            controls,
+            textvariable=self.browse_membership_filter,
+            state="disabled",
+            values=(
+                "Everyone",
+                "Follows profile only",
+                "Profile follows only",
+                "Mutual follows",
+            ),
+            width=22,
+        )
+        self.browse_filter_box.pack(side="left")
         ttk.Button(controls, text="Show list", style="Accent.TButton", command=self._load_browse).pack(
-            side="left", padx=12
+            side="left", padx=8
+        )
+        ttk.Label(
+            self.browse_tab,
+            text="Follows profile only = in Followers, not Following. "
+            "Profile follows only = in Following, not Followers.",
+            style="Muted.TLabel",
+        ).pack(anchor="w", pady=(0, 10))
+        self.browse_relationship_box.bind(
+            "<<ComboboxSelected>>", self._browse_relationship_changed
+        )
+        self.browse_filter_box.bind(
+            "<<ComboboxSelected>>", lambda _event: self._load_browse()
         )
         self.browse_tree = self._tree(
             self.browse_tab, ("membership", "username"),
@@ -700,7 +953,26 @@ class CirclioReportApp:
         messagebox.showinfo("Table exported", f"Saved Excel table to:\n{output}", parent=self.root)
 
     def refresh(self):
+        self.profile_values = self._profiles()
+        self.profile_box.configure(values=self.profile_values)
         profile = self.profile.get()
+        if not profile:
+            if not self.profile_values:
+                self.snapshots = []
+                self.snapshot_choices = []
+                self.dates = []
+                self._fill_snapshots()
+                self._refresh_dashboard()
+                self._refresh_changes()
+                self._append_server_log(
+                    "No saved profiles yet. Collect a snapshot, then select Refresh reports."
+                )
+                return
+            self.profile.set(self.profile_values[0])
+            profile = self.profile.get()
+        elif profile not in self.profile_values:
+            self.profile.set(self.profile_values[0] if self.profile_values else "")
+            profile = self.profile.get()
         if not profile:
             return
         self.snapshot_choices = snapshot_choices(self.connection, profile)
@@ -909,9 +1181,14 @@ class CirclioReportApp:
         )
         choice = self.browse_relationship.get().lower()
         self._clear_tree(self.browse_tree)
-        for marker, username, avatar_path in browse_members(
+        rows = browse_members(
             self.connection, collection[0], choice
-        ):
+        )
+        if choice == "both":
+            rows = filter_browse_members(
+                rows, self.browse_membership_filter.get()
+            )
+        for marker, username, avatar_path in rows:
             color_tag = {
                 "[=] Both": "both",
                 "[F] Followers only": "followers-only",
@@ -923,6 +1200,14 @@ class CirclioReportApp:
                 tags=(color_tag,) if color_tag else (),
             )
         self._refresh_tree_search(self.browse_tree)
+
+    def _browse_relationship_changed(self, _event=None):
+        is_combined = self.browse_relationship.get().lower() == "both"
+        self.browse_filter_box.configure(
+            state="readonly" if is_combined else "disabled"
+        )
+        if self.browse_date.get() in self.snapshot_ids:
+            self._load_browse()
 
     def _load_comparison(self):
         if self.from_date.get() not in self.snapshot_ids or self.to_date.get() not in self.snapshot_ids:
@@ -1060,6 +1345,14 @@ class CirclioReportApp:
         messagebox.showerror("IB Circlio", message, parent=self.root)
 
     def close(self):
+        process = self.server_process
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=2)
         self.connection.close()
         self.root.destroy()
 
@@ -1072,37 +1365,32 @@ def format_timestamp(value):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="IB Circlio desktop reports")
+    parser = argparse.ArgumentParser(description="IB_Circlio desktop application")
     parser.add_argument(
         "--data-dir",
         default=str(Path.home() / "Desktop" / "Instagram Exporter Data"),
     )
     args = parser.parse_args()
-    database_path = Path(args.data_dir) / "instagram.db"
+    data_dir = Path(args.data_dir).expanduser()
+    database_path = data_dir / "instagram.db"
     root = tk.Tk()
-    if not database_path.exists():
-        root.withdraw()
-        messagebox.showerror(
-            "No report database found",
-            f"No collection database exists yet:\n{database_path}\n\n"
-            "Start the local server and collect a snapshot first.",
-            parent=root,
-        )
-        root.destroy()
-        return
     try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        database = server.Database(str(database_path))
+        database.close()
         connection = sqlite3.connect(f"{database_path.as_uri()}?mode=ro", uri=True)
         connection.row_factory = sqlite3.Row
-        app = CirclioReportApp(root, connection)
+        app = CirclioReportApp(root, connection, data_dir)
         if not app.profile_values:
             messagebox.showinfo(
-                "No snapshots yet",
-                "No profiles are saved yet. Collect a snapshot with the extension first.",
+                "Welcome to IB_Circlio",
+                "Start the collection service here, then collect a snapshot "
+                "from the browser extension.",
                 parent=root,
             )
         root.mainloop()
-    except (OSError, sqlite3.Error, tk.TclError) as error:
-        messagebox.showerror("IB Circlio could not start", str(error), parent=root)
+    except (OSError, sqlite3.Error, tk.TclError, ValueError) as error:
+        messagebox.showerror("IB_Circlio could not start", str(error), parent=root)
         root.destroy()
 
 

@@ -7,9 +7,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-BUILD_DIR = ROOT / "build"
-DIST_DIR = ROOT / "dist"
-RELEASE_DIR = ROOT / "release" / "IB Circlio-1.0.3-windows"
+VERSION = "1.0.4"
+RELEASE_NAME = f"IB Circlio-{VERSION}-windows"
+BUILD_DIR = ROOT / "build" / RELEASE_NAME
+DIST_DIR = BUILD_DIR / "dist"
+RELEASE_DIR = ROOT / "release" / RELEASE_NAME
 
 
 def run_pyinstaller(script, name, windowed=False):
@@ -40,9 +42,12 @@ def run_pyinstaller(script, name, windowed=False):
 def main():
     if sys.platform != "win32":
         raise SystemExit("Portable release builds are supported on Windows only.")
-    for path in (BUILD_DIR, DIST_DIR, RELEASE_DIR):
-        if path.exists():
-            shutil.rmtree(path)
+    if RELEASE_DIR.exists():
+        raise SystemExit(
+            f"Release output already exists; move it aside before rebuilding: {RELEASE_DIR}"
+        )
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    RELEASE_DIR.parent.mkdir(parents=True, exist_ok=True)
     DIST_DIR.mkdir(parents=True)
     RELEASE_DIR.mkdir(parents=True)
     for script, name in (
