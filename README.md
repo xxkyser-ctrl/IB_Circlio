@@ -51,23 +51,30 @@ The extension reads the Instagram page as rendered in the user's browser; it doe
 
 ### Architecture
 
-```mermaid
-flowchart LR
-    User --> Instagram[Instagram profile in browser]
-    Instagram --> Content[Extension content script]
-    User --> Popup[Extension popup]
-    Popup <--> Background[Extension background worker]
-    Content <--> Background
-    Background -->|HTTP on 127.0.0.1:8765 with local token| API[Python local service]
-    API --> DB[(SQLite database)]
-    API --> Images[Local avatar archive]
-    Instagram -. image URLs .-> API
-    DB --> Reports[Tkinter desktop reports]
-    Images --> Reports
-    Reports --> Excel[Excel .xlsx exports]
+```text
+ Instagram profile in browser
+       |
+       +--> content.js reads Followers and Following dialogs
+       |                      |
+       |                      v
+       +--> popup.js <--> background.js
+                              |
+                              | HTTP + local token (127.0.0.1:8765)
+                              v
+                     server.py (local API)
+                        /           \
+                       v             v
+             SQLite database     Local avatar files
+                       \             /
+                        v           v
+                    result_gui.py (desktop reports)
+                              |
+                    Compare, browse, export
+                              |
+                         Excel .xlsx
 ```
 
-The service listens on the loopback interface (`127.0.0.1`), not on a public network interface. The default local data directory is `%USERPROFILE%\Desktop\Instagram Exporter Data`.
+The desktop app starts and stops the local service and reads the same local database for reports. The service listens on the loopback interface (`127.0.0.1`), not on a public network interface. The default local data directory is `%USERPROFILE%\Desktop\Instagram Exporter Data`.
 
 ## Tech stack
 
@@ -89,6 +96,7 @@ IB_Circlio does not use a hosted application backend, a hosted database, or Inst
 
 ```text
 IB_Circlio/
+├── .gitignore                  # Excludes Python bytecode caches and local data
 ├── background.js              # Extension worker and local API requests
 ├── content.js                 # Reads and scrolls Instagram list dialogs
 ├── popup.html                 # Extension popup markup
@@ -160,8 +168,10 @@ The source folder can be loaded as an unpacked browser extension. Open the integ
 The single launcher starts the unified interface, which can start the local service and show its status and logs. It uses the packaged executable when present and otherwise uses Python source scripts. To run the interface directly from source:
 
 ```powershell
-py -3 result_gui.py --data-dir "$env:USERPROFILE\Desktop\Instagram Exporter Data"
+py -3 -B result_gui.py --data-dir "$env:USERPROFILE\Desktop\Instagram Exporter Data"
 ```
+
+Use `py -3 -B` for direct Python commands from the source folder to avoid creating `__pycache__` directories.
 
 To run the test suite:
 
@@ -175,7 +185,7 @@ To build the portable Windows package from source:
 py -3 -B build_release.py
 ```
 
-The build script requires Windows and the packages in `requirements-build.txt`. It creates version-specific build files under `build/IB Circlio-1.0.6-windows/` and the portable app under `release/IB Circlio-1.0.6-windows/` without deleting other release or build output.
+The build script requires Windows and the packages in `requirements-build.txt`. It creates version-specific build files under `build/IB Circlio-1.0.6-windows/` and the portable app under `release/IB Circlio-1.0.6-windows/` without deleting other release or build output. Run Python with `-B` (as in the command above) to prevent bytecode cache files from being written into the source folder.
 
 ## Environment variables and configuration
 
@@ -199,6 +209,8 @@ For normal use, open the integrated application:
 2. Open the **Collection service** tab and select the green **Start service** button. The status and service output are shown in the application.
 3. Open Instagram and use the extension to collect a profile.
 4. Return to the desktop application to browse, compare, and export using the report tabs. Reports refresh automatically while the service runs; use **Refresh reports** for a manual reload. The red **Stop service** button stops the backend; closing the app stops it as well.
+
+To erase locally saved collection history and archived avatars, stop the service, close the desktop app, and use the password-protected [local data reset utility](#clearing-local-collection-data).
 
 Select the red **Stop service** button in the application when collection is finished. Closing the application also stops the service it started. Avoid running a second service instance against the same data directory.
 
@@ -272,6 +284,18 @@ The service creates the schema when it opens the database and applies a small se
 | `collection_avatar_versions` | The avatar file, source URL, and fetch time associated with a particular collection. |
 
 Each profile can have many collections. A collection records its memberships through `collection_memberships`, which links the shared `users` rows to the collection and relationship type. `membership_changes` records additions and removals for that collection. Avatar records link usernames and collections to local image files. Memberships and change history are stored in SQLite; image files are stored separately in an `avatars` subfolder beside the selected database. The database and image archive are not encrypted by IB_Circlio.
+
+## Clearing local collection data
+
+Use the reset utility only when you intend to permanently erase the locally collected history. Stop the collection service and close the IB_Circlio desktop app first.
+
+- From a source checkout, run `clear_database.bat`.
+- From a portable release, run `clear_database.bat` or `ib-circlio-clear-database.exe`.
+- From a source command prompt, run `py -3 -B clear_database.py --data-dir "$env:USERPROFILE\Desktop\Instagram Exporter Data"`.
+
+The first run asks you to create and confirm a separate clear password. The utility stores a salted password hash in `clear-password.txt` under the data directory. Later runs require that password. Every run also requires the exact confirmation `CLEAR`; any other response cancels the reset.
+
+After confirmation, the utility deletes the saved profiles, collections, memberships, recorded changes, and archived avatar files. This is permanent and there is no undo. It does not delete the database file itself, the clear-password file, the service token or extension configuration, or Excel workbooks you previously exported. Keep backups of anything you may need.
 
 ## Screenshots and demo
 
