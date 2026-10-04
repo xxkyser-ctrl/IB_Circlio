@@ -1,12 +1,14 @@
-# IB_Circlio
+# IB Circlio
 
 **A Windows application and browser extension for collecting Instagram follower and following snapshots, comparing changes over time, and exporting local reports.**
 
-IB_Circlio keeps timestamped snapshots of the follower and following lists visible on an Instagram profile. It compares those snapshots to show which usernames appeared or disappeared between collections, and can also record profile-picture versions when Instagram exposes an image in a list row.
+The product is branded as **IB Circlio**; `IB_Circlio` is its GitHub repository and project-site identifier.
 
-The project combines a browser extension with a small Python service and a desktop report application. Collection history, change records, and downloaded profile pictures are stored on the user's PC in SQLite and local files; IB_Circlio does not provide a cloud account or hosted data service. It is intended for people who want to review changes in lists available to their signed-in browser and keep their own local history.
+IB Circlio keeps timestamped snapshots of the follower and following lists visible on an Instagram profile. It compares those snapshots to show which usernames appeared or disappeared between collections, and can also record profile-picture versions when Instagram exposes an image in a list row.
 
-> IB_Circlio can report only what it successfully collected. It cannot recover changes from before the first snapshot, guarantee that Instagram rendered every account, or access information unavailable to the signed-in browser.
+The project combines a browser extension with a small Python service and a desktop report application. Collection history, change records, and downloaded profile pictures are stored on the user's PC in SQLite and local files; IB Circlio does not provide a cloud account or hosted data service. It is intended for people who want to review changes in lists available to their signed-in browser and keep their own local history.
+
+> IB Circlio can report only what it successfully collected. It cannot recover changes from before the first snapshot, guarantee that Instagram rendered every account, or access information unavailable to the signed-in browser.
 
 [![Latest release](https://img.shields.io/github/v/release/xxkyser-ctrl/IB_Circlio)](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest)
 
@@ -14,12 +16,12 @@ The project combines a browser extension with a small Python service and a deskt
 
 ## Overview
 
-Instagram's current follower and following lists do not provide a personal, timestamped history of every account shown. IB_Circlio lets a user collect those lists periodically and compare saved snapshots, so a later report can show additions, removals, and the collection time at which each observed transition occurred.
+Instagram's current follower and following lists do not provide a personal, timestamped history of every account shown. IB Circlio lets a user collect those lists periodically and compare saved snapshots, so a later report can show additions, removals, and the collection time at which each observed transition occurred.
 
 The main workflow is:
 
 1. Open an Instagram profile while signed in through a supported browser.
-2. Start a collection from the IB_Circlio extension. It reads the profile's visible Followers and Following dialogs.
+2. Start a collection from the IB Circlio extension. It reads the profile's visible Followers and Following dialogs.
 3. The extension sends the usernames and any available image URLs to the local service running on the same PC.
 4. The service stores the snapshot, calculates changes from the previous complete snapshot, and attempts to archive available profile pictures.
 5. Use the desktop report application to browse, search, compare, and export saved data.
@@ -33,7 +35,7 @@ Each collection is an observation, not a live connection to Instagram. A first c
 - **See follower and following changes.** Compare snapshots to find accounts added to or removed from each relationship list.
 - **Trace changes between any two snapshots.** The comparison view can show every recorded transition between an older **From** snapshot and a newer **To** snapshot, including an account that left and later returned.
 - **Browse and search saved lists.** View Followers, Following, or Both for a snapshot. Search fields filter table rows without changing the saved data.
-- **Review profile-picture history.** When a usable image URL is visible, IB_Circlio downloads a local copy for that collection. The report can display archived pictures, open an available picture at a larger size, and identify changed image URLs between collections.
+- **Review profile-picture history.** When a usable image URL is visible, IB Circlio downloads a local copy for that collection. The report can display archived pictures, open an available picture at a larger size, and identify changed image URLs between collections.
 - **Export Excel workbooks and table views.** Create a formatted `.xlsx` report for a snapshot or export the currently displayed rows of an individual report table.
 - **Refresh reports automatically.** While the local collection service is running, the desktop app detects saved database changes and updates the report views; manual refresh is still available.
 - **Check collection totals.** The report distinguishes the number of usernames actually saved from Instagram's displayed header totals. A displayed total is marked unverified when it cannot be validated against the collected list.
@@ -53,7 +55,7 @@ The extension reads the Instagram page as rendered in the user's browser; it doe
 
 ### Architecture
 
-![IB_Circlio architecture](docs/architecture.svg)
+![IB Circlio architecture](docs/architecture.svg)
 
 The desktop app starts and stops the local service and reads the same local database for reports. The service listens on the loopback interface (`127.0.0.1`), not on a public network interface. The default local data directory is `%USERPROFILE%\Desktop\Instagram Exporter Data`.
 
@@ -71,7 +73,7 @@ The desktop app starts and stops the local service and reads the same local data
 | PyInstaller | Building portable Windows executables |
 | Instagram website | Source of the profile lists and any image URLs exposed in the browser |
 
-IB_Circlio does not use a hosted application backend, a hosted database, or Instagram API credentials.
+IB Circlio does not use a hosted application backend, a hosted database, or Instagram API credentials.
 
 ## Project structure
 
@@ -116,10 +118,10 @@ The portable release includes the extension source files and Windows executables
    - Opera: `opera://extensions`
    - Vivaldi: `vivaldi://extensions`
 3. Enable **Developer mode**, select **Load unpacked**, and choose the extracted release folder.
-4. Double-click `ib_circlio.exe` to open the IB_Circlio desktop application. The app creates the local data directory, token, and extension configuration. In its **Collection service** tab, select the green **Start service** button and confirm the status changes to **Running**.
-5. Sign in to Instagram normally, open the profile whose lists you want to collect, and click the IB_Circlio extension.
+4. Double-click `ib_circlio.exe` to open the IB Circlio desktop application. The app creates the local data directory, token, and extension configuration. In its **Collection service** tab, select the green **Start service** button and confirm the status changes to **Running**.
+5. Sign in to Instagram normally, open the profile whose lists you want to collect, and click the IB Circlio extension.
 6. Select **Start collection**. The extension reads Followers and Following in sequence and reports when the snapshot is saved.
-7. Return to the same IB_Circlio window to browse, compare, search, and export saved collections. Reports refresh automatically while the service is running; **Refresh reports** remains available for a manual reload. Select the red **Stop service** button when finished; closing the app also stops its service.
+7. Return to the same IB Circlio window to browse, compare, search, and export saved collections. Reports refresh automatically while the service is running; **Refresh reports** remains available for a manual reload. Select the red **Stop service** button when finished; closing the app also stops its service.
 
 The repository includes a Firefox-specific manifest. Firefox extension origins are not included in the local service's current explicit origin allowlist; therefore, end-to-end Firefox collection is not documented as a supported workflow. The Chromium-based browsers above use the standard manifest and are the intended installation path.
 
@@ -170,7 +172,7 @@ The build script requires Windows and the packages in `requirements-build.txt`. 
 
 ## Environment variables and configuration
 
-IB_Circlio does not load a `.env` file and does not require external API keys. The service reads the following optional variables from its process environment when started directly:
+IB Circlio does not load a `.env` file and does not require external API keys. The service reads the following optional variables from its process environment when started directly:
 
 | Variable | Purpose | Required |
 |---|---|---|
@@ -246,7 +248,7 @@ The API also handles `OPTIONS` preflight requests for permitted origins. The ext
 
 ## Database
 
-IB_Circlio uses Python's built-in `sqlite3` module. By default, `instagram.db` is stored in:
+IB Circlio uses Python's built-in `sqlite3` module. By default, `instagram.db` is stored in:
 
 ```text
 %USERPROFILE%\Desktop\Instagram Exporter Data\instagram.db
@@ -264,11 +266,11 @@ The service creates the schema when it opens the database and applies a small se
 | `avatar_cache` | The most recent cached avatar file and source URL for a username. |
 | `collection_avatar_versions` | The avatar file, source URL, and fetch time associated with a particular collection. |
 
-Each profile can have many collections. A collection records its memberships through `collection_memberships`, which links the shared `users` rows to the collection and relationship type. `membership_changes` records additions and removals for that collection. Avatar records link usernames and collections to local image files. Memberships and change history are stored in SQLite; image files are stored separately in an `avatars` subfolder beside the selected database. The database and image archive are not encrypted by IB_Circlio.
+Each profile can have many collections. A collection records its memberships through `collection_memberships`, which links the shared `users` rows to the collection and relationship type. `membership_changes` records additions and removals for that collection. Avatar records link usernames and collections to local image files. Memberships and change history are stored in SQLite; image files are stored separately in an `avatars` subfolder beside the selected database. The database and image archive are not encrypted by IB Circlio.
 
 ## Clearing local collection data
 
-Use the reset utility only when you intend to permanently erase the locally collected history. Stop the collection service and close the IB_Circlio desktop app first.
+Use the reset utility only when you intend to permanently erase the locally collected history. Stop the collection service and close the IB Circlio desktop app first.
 
 - From a source checkout, run `clear_database.bat`.
 - From a portable release, run `clear_database.bat` or `ib-circlio-clear-database.exe`.
@@ -282,25 +284,25 @@ After confirmation, the utility deletes the saved profiles, collections, members
 
 The repository contains privacy-redacted screenshots of collection and the report tabs. Usernames, profile photos, and surrounding browser content are obscured or omitted:
 
-![IB_Circlio collecting Instagram followers](docs/screenshots/demo-followers.png)
+![IB Circlio collecting Instagram followers](docs/screenshots/demo-followers.png)
 
-![IB_Circlio collecting Instagram following](docs/screenshots/demo-following.png)
+![IB Circlio collecting Instagram following](docs/screenshots/demo-following.png)
 
-![IB_Circlio showing that follower and following lists were saved](docs/screenshots/demo-finished.png)
+![IB Circlio showing that follower and following lists were saved](docs/screenshots/demo-finished.png)
 
-![IB_Circlio collection service running in the desktop app](docs/screenshots/demo-service.png)
+![IB Circlio collection service running in the desktop app](docs/screenshots/demo-service.png)
 
-![IB_Circlio overview report](docs/screenshots/demo-overview.png)
+![IB Circlio overview report](docs/screenshots/demo-overview.png)
 
-![IB_Circlio snapshot report](docs/screenshots/demo-snapshot.png)
+![IB Circlio snapshot report](docs/screenshots/demo-snapshot.png)
 
-![IB_Circlio browse list report](docs/screenshots/demo-browse.png)
+![IB Circlio browse list report](docs/screenshots/demo-browse.png)
 
-![IB_Circlio Excel export report](docs/screenshots/demo-export.png)
+![IB Circlio Excel export report](docs/screenshots/demo-export.png)
 
-![IB_Circlio snapshot comparison report](docs/screenshots/demo-compare.png)
+![IB Circlio snapshot comparison report](docs/screenshots/demo-compare.png)
 
-![IB_Circlio empty changes view before a second snapshot](docs/screenshots/demo-changes.png)
+![IB Circlio empty changes view before a second snapshot](docs/screenshots/demo-changes.png)
 
 ## Configuration
 
@@ -312,11 +314,11 @@ The repository contains privacy-redacted screenshots of collection and the repor
 
 ## Deployment
 
-IB_Circlio is designed to run locally on Windows. The repository contains a Windows packaging script that creates portable executables and a release folder; it does not define a hosted deployment, cloud service, or public API deployment process.
+IB Circlio is designed to run locally on Windows. The repository contains a Windows packaging script that creates portable executables and a release folder; it does not define a hosted deployment, cloud service, or public API deployment process.
 
 ## Troubleshooting
 
-- **The extension reports that it cannot reach the database:** open the IB_Circlio application, select the green **Start service** button, and confirm the status is **Running**. Confirm that the extension was loaded from the extracted folder and that its local configuration was created.
+- **The extension reports that it cannot reach the database:** open the IB Circlio application, select the green **Start service** button, and confirm the status is **Running**. Confirm that the extension was loaded from the extracted folder and that its local configuration was created.
 - **The extension does not respond on an Instagram tab that was already open:** reload the Instagram tab after installing or updating the extension.
 - **The extension reports that a list dialog did not open:** open a profile page, allow it to finish rendering, and try again. If necessary, open the Followers or Following count once manually and retry.
 - **A collection is partial or appears short:** Instagram loads list content dynamically and may rate-limit or change its page markup. Keep the tab open during collection and retry later. Partial collections are saved for inspection but excluded from complete-snapshot comparisons.
@@ -329,9 +331,9 @@ IB_Circlio is designed to run locally on Windows. The repository contains a Wind
 
 ## Security and privacy
 
-- IB_Circlio does not ask for or store an Instagram password and does not use Instagram API credentials.
+- IB Circlio does not ask for or store an Instagram password and does not use Instagram API credentials.
 - The local service binds to `127.0.0.1`, uses a random bearer token for data routes, and restricts browser-origin access to its configured extension origin rule.
-- The application does not upload collection history to an IB_Circlio cloud service. The browser accesses Instagram, and the service may request profile-picture URLs that the page exposed.
+- The application does not upload collection history to an IB Circlio cloud service. The browser accesses Instagram, and the service may request profile-picture URLs that the page exposed.
 - The SQLite database, local token, archived profile pictures, and exported workbooks are sensitive. They are not encrypted by the application; protect your Windows account and backups.
 - Do not publish `config.js`, `server-token.txt`, database files, exported workbooks, or screenshots containing real usernames.
 - Stop the local service when it is not in use. See [SECURITY.md](SECURITY.md) for the repository's security model and release checklist.
@@ -345,7 +347,7 @@ IB_Circlio is designed to run locally on Windows. The repository contains a Wind
 - Avatar capture is best-effort. It depends on Instagram exposing a usable image URL and the image being downloadable at collection time.
 - Archived usernames, images, and exported reports remain on the local PC until the user deletes them.
 - The Firefox manifest is included, but the local service currently has an explicit Chrome-extension-origin allowlist; use the Chromium-based browsers documented above for the intended workflow.
-- IB_Circlio is an independent project and is not affiliated with, endorsed by, or sponsored by Instagram or Meta.
+- IB Circlio is an independent project and is not affiliated with, endorsed by, or sponsored by Instagram or Meta.
 
 ## Roadmap
 
