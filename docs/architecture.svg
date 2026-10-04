@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="642" viewBox="0 0 1200 700" role="img" aria-labelledby="title description">
+  <title id="title">IB_Circlio architecture</title>
+  <desc id="description">The browser extension reads visible Instagram lists and sends them to the local Python service. The service stores snapshots in SQLite and avatars on disk. The desktop reports read this local data and export Excel workbooks.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#526579"/>
+    </marker>
+    <marker id="arrow-reverse" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto">
+      <path d="M10 0 L0 5 L10 10 Z" fill="#526579"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #182230; }
+      .group-title { font-size: 15px; font-weight: 700; letter-spacing: 1.2px; }
+      .node-title { font-size: 16px; font-weight: 700; }
+      .node-copy { font-size: 13px; fill: #46566a; }
+      .edge-label { font-size: 11px; font-weight: 600; fill: #526579; }
+      .node { fill: #ffffff; stroke: #9aabbc; stroke-width: 1.5; }
+      .edge { fill: none; stroke: #526579; stroke-width: 2.5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="700" rx="18" fill="#f5f8fc"/>
+  <text x="30" y="54" font-size="28" font-weight="700">IB_Circlio architecture</text>
+  <text x="30" y="82" font-size="15" fill="#526579">Collect visible Instagram lists, compare snapshots, and keep reports local.</text>
+
+  <rect x="30" y="120" width="450" height="510" rx="20" fill="#edf5ff" stroke="#b7cce5" stroke-width="1.5"/>
+  <text class="group-title" x="54" y="158" fill="#245b91">BROWSER</text>
+  <rect x="500" y="120" width="670" height="510" rx="20" fill="#edf8f2" stroke="#b6d8c3" stroke-width="1.5"/>
+  <text class="group-title" x="524" y="158" fill="#26734d">LOCAL PC</text>
+
+  <rect class="node" x="50" y="204" width="175" height="100" rx="12"/>
+  <text class="node-title" x="66" y="236">Instagram profile</text>
+  <text class="node-copy" x="66" y="262">Visible Followers and</text>
+  <text class="node-copy" x="66" y="282">Following lists</text>
+
+  <rect class="node" x="280" y="204" width="175" height="100" rx="12"/>
+  <text class="node-title" x="296" y="236">Extension popup</text>
+  <text class="node-copy" x="296" y="262">Start / stop collection</text>
+  <text class="node-copy" x="296" y="282">Progress and status</text>
+
+  <rect class="node" x="50" y="398" width="175" height="100" rx="12"/>
+  <text class="node-title" x="66" y="430">Content script</text>
+  <text class="node-copy" x="66" y="456">Reads visible list rows</text>
+  <text class="node-copy" x="66" y="476">Usernames and image URLs</text>
+
+  <rect class="node" x="280" y="398" width="175" height="100" rx="12"/>
+  <text class="node-title" x="296" y="430">Background worker</text>
+  <text class="node-copy" x="296" y="456">Routes extension messages</text>
+  <text class="node-copy" x="296" y="476">Calls the local service</text>
+
+  <path class="edge" d="M137 304 V388"/>
+  <text class="edge-label" x="149" y="352">rendered lists</text>
+  <path class="edge" d="M367 304 V388"/>
+  <text class="edge-label" x="379" y="352">controls</text>
+  <path d="M235 448 H270" fill="none" stroke="#526579" stroke-width="2.5" marker-start="url(#arrow-reverse)" marker-end="url(#arrow)"/>
+  <text class="edge-label" x="233" y="433">messages</text>
+
+  <rect class="node" x="520" y="386" width="190" height="112" rx="12" stroke="#6aa581"/>
+  <text class="node-title" x="536" y="422">Python local service</text>
+  <text class="node-copy" x="536" y="448">Validates and compares</text>
+  <text class="node-copy" x="536" y="470">snapshots on 127.0.0.1</text>
+  <path class="edge" d="M455 448 H510"/>
+  <text class="edge-label" x="463" y="368">HTTP + local token</text>
+
+  <rect class="node" x="745" y="220" width="170" height="96" rx="12" stroke="#6aa581"/>
+  <text class="node-title" x="761" y="255">SQLite database</text>
+  <text class="node-copy" x="761" y="281">Snapshots and changes</text>
+
+  <rect class="node" x="745" y="420" width="170" height="96" rx="12" stroke="#6aa581"/>
+  <text class="node-title" x="761" y="455">Avatar archive</text>
+  <text class="node-copy" x="761" y="481">Images stored on disk</text>
+
+  <path class="edge" d="M710 410 C730 385 730 320 745 278"/>
+  <text class="edge-label" x="714" y="344">save collections</text>
+  <path class="edge" d="M710 468 H735"/>
+
+  <rect class="node" x="945" y="300" width="190" height="108" rx="12" stroke="#6aa581"/>
+  <text class="node-title" x="961" y="337">Desktop reports</text>
+  <text class="node-copy" x="961" y="363">Browse and compare</text>
+  <text class="node-copy" x="961" y="384">local collection data</text>
+
+  <rect class="node" x="945" y="470" width="190" height="80" rx="12" stroke="#6aa581"/>
+  <text class="node-title" x="961" y="503">Excel workbooks</text>
+  <text class="node-copy" x="961" y="526">.xlsx exports</text>
+
+  <path class="edge" d="M915 270 C930 270 930 330 935 340"/>
+  <path class="edge" d="M915 468 C930 468 930 385 935 376"/>
+  <path class="edge" d="M1040 408 V460"/>
+  <text class="edge-label" x="1052" y="441">export</text>
+</svg>

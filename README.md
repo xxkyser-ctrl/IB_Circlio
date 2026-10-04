@@ -51,21 +51,7 @@ The extension reads the Instagram page as rendered in the user's browser; it doe
 
 ### Architecture
 
-```mermaid
-flowchart LR
-    User["User"] --> Instagram["Instagram profile in browser"]
-    Instagram --> Content["Extension content script"]
-    User --> Popup["Extension popup"]
-    Popup <--> Background["Extension background worker"]
-    Content <--> Background
-    Background -->|"HTTP + local token"| API["Python local service (127.0.0.1:8765)"]
-    API --> DB[("SQLite database")]
-    API --> Images["Local avatar archive"]
-    Instagram -. "image URLs" .-> API
-    DB --> Reports["Tkinter desktop reports"]
-    Images --> Reports
-    Reports --> Excel["Excel .xlsx exports"]
-```
+![IB_Circlio architecture](docs/architecture.svg)
 
 The desktop app starts and stops the local service and reads the same local database for reports. The service listens on the loopback interface (`127.0.0.1`), not on a public network interface. The default local data directory is `%USERPROFILE%\Desktop\Instagram Exporter Data`.
 
