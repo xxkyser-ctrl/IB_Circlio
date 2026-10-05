@@ -5,10 +5,11 @@ import getpass
 import hashlib
 import hmac
 import secrets
-import sqlite3
 import shutil
 from pathlib import Path
 
+import database as database_access
+import encryption
 from data_paths import default_data_dir
 from file_permissions import restrict_to_current_user
 
@@ -53,10 +54,18 @@ def clear_database(path):
     if not path.exists():
         print("Database does not exist; nothing to clear.")
         return
-    connection = sqlite3.connect(path)
+    data_dir = path.parent
+    database_access._check_service_stopped(data_dir)
+    connection = database_access.open_database(path, create=False)
     try:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("BEGIN")
+        existing_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
         for table in (
             "membership_changes",
             "collection_memberships",
@@ -66,15 +75,40 @@ def clear_database(path):
             "users",
             "avatar_cache",
         ):
-            try:
+            if table in existing_tables:
                 connection.execute(f"DELETE FROM {table}")
-            except sqlite3.OperationalError:
-                pass
         connection.commit()
     finally:
         connection.close()
-    shutil.rmtree(path.parent / "avatars", ignore_errors=True)
+    avatars = data_dir / "avatars"
+    if avatars.exists():
+        shutil.rmtree(avatars)
     print("All profiles, collections, users, and changes were cleared.")
+
+
+def unlock_encrypted_data(data_dir):
+    metadata = encryption.load_metadata(data_dir)
+    if metadata is None:
+        return
+    try:
+        if metadata["key_mode"] == "dpapi":
+            encryption.load_master_key(data_dir)
+            return
+        passphrase = getpass.getpass("Enter the data-encryption passphrase: ")
+        if passphrase:
+            encryption.load_master_key(data_dir, passphrase=passphrase)
+            return
+    except encryption.EncryptionError as error:
+        print(f"Could not unlock the data key: {error}")
+    except OSError as error:
+        print(f"Could not open the Windows-protected key: {error}")
+
+    recovery_key = getpass.getpass("Enter the saved data recovery key: ")
+    if not recovery_key:
+        raise encryption.MissingKeyError(
+            "A valid passphrase or recovery key is required to clear encrypted data."
+        )
+    encryption.load_master_key(data_dir, recovery_key=recovery_key)
 
 
 def main():
@@ -89,12 +123,13 @@ def main():
     confirmation = input("Type CLEAR to permanently delete all database data: ")
     if confirmation != "CLEAR":
         raise ValueError("Clear cancelled.")
+    unlock_encrypted_data(data_dir)
     clear_database(database_path)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, *database_access.SQLITE_ERRORS) as error:
         print(f"Error: {error}")
         raise SystemExit(1)

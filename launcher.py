@@ -4,18 +4,17 @@ import argparse
 import secrets
 from pathlib import Path
 
+import encryption
 from file_permissions import restrict_to_current_user
 
 
 def prepare_local_config(data_dir, config_path):
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
-    token_path = data_dir / "server-token.txt"
-    token = token_path.read_text(encoding="utf-8").strip() if token_path.exists() else ""
+    token = encryption.read_token(data_dir)
     if len(token) < 32 or any(character.isspace() for character in token):
         token = secrets.token_urlsafe(32)
-        token_path.write_text(token + "\n", encoding="utf-8")
-    restrict_to_current_user(token_path)
+    token_path = encryption.write_token(data_dir, token)
 
     config = (
         "// Generated locally. Do not commit this file.\n"

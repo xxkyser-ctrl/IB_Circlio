@@ -1,2 +1,4 @@
 pyinstaller==6.22.3
 Pillow==12.3.0
+sqlcipher3-wheels==0.5.7
+cryptography==50.0.2

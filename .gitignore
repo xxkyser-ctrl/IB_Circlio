@@ -7,6 +7,13 @@ instagram.db
 *.py[cod]
 **/*.py[cod]
 config.js
+server-token.txt
+server-token.enc
+encryption.json
+master-key.dpapi
+migration.json
+service.lock
+*.tmp
 *.xlsx
 build/
 dist/

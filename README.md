@@ -103,14 +103,14 @@ The build uses `requirements-build.txt` and writes version-specific output benea
 | Path | Purpose |
 |---|---|
 | `background.js`, `content.js`, `popup.js`, `popup.html` | Browser extension collection workflow |
-| `server.py`, `launcher.py` | Local API, SQLite persistence, and application startup |
+| `server.py`, `launcher.py`, `database.py`, `encryption.py` | Local API, persistence, key management, and startup |
 | `result_gui.py`, `result.py` | Desktop reports, command-line reporting, and workbook export |
 | `clear_database.py`, `clear_database.bat` | Confirmed local-data reset utility |
 | `manifest.json` | Chromium extension manifest |
 | `manifest.firefox.json` | Firefox manifest; see the compatibility note above |
 | `release_check.py`, `version.py`, `data_paths.py`, `file_permissions.py` | Update checks, canonical version, local data paths, and secret-file permissions |
-| `test_server.py`, `test_result.py`, `test_updates.py`, `test_extension_updates.js`, `test_data_paths.py`, `test_file_permissions.py`, `test_build_release.py` | Automated tests |
-| `docs/` | Project website, architecture diagram, and existing screenshots |
+| `test_server.py`, `test_result.py`, `test_updates.py`, `test_encryption.py`, `test_extension_updates.js`, `test_data_paths.py`, `test_file_permissions.py`, `test_build_release.py` | Automated tests |
+| `docs/` | Project website, architecture diagram, screenshots, and encryption guide |
 
 ## Local data and privacy
 
@@ -118,9 +118,9 @@ The build uses `requirements-build.txt` and writes version-specific output benea
 - The extension sends collection results to the service on `127.0.0.1:8765`. The app creates a local token for requests to protected service routes.
 - Collection history is not sent to an IB Circlio cloud service. The browser still connects to Instagram, and the service may download profile pictures from URLs Instagram exposed in the page.
 - Optional update checks are enabled by default in the desktop app and extension. Each checks GitHub's public release API at most once per day (plus manual checks) and sends no usernames, collection data, token, or other personal data. Turn the checks off independently using **Check for updates automatically** in the desktop app and **Check for updates** in the extension popup.
-- The database, local token, archived pictures, and exported workbooks are not encrypted. Database encryption is planned but is not currently available as an option. Protect your Windows account and local backups.
+- New Windows data folders encrypt the database, local service token, and archived pictures. Existing plaintext data is preserved until you choose **Enable local encryption** in the desktop app; migration creates a sibling backup first. Excel exports and the generated browser `config.js` remain plaintext. See [the encryption guide](docs/encryption.md) for recovery and migration details.
 - The extension stores only update-check preferences and release metadata in browser extension storage; follower/following lists and collection history remain in the local SQLite database.
-- Do not publish `config.js`, `server-token.txt`, database files, exported workbooks, or screenshots containing real usernames.
+- Do not publish `config.js`, token or key files, encryption metadata, database files, exported workbooks, migration backups, or screenshots containing real usernames.
 
 For direct service or development workflows, `INSTAGRAM_DB` overrides the default database path and `INSTAGRAM_PORT` sets the port (default `8765`). Starting the service directly also requires a random `INSTAGRAM_EXPORTER_TOKEN` of at least 32 non-whitespace characters, or a `--token-file`. The desktop app creates and manages the local token and extension configuration for normal use. The direct `--data-dir` option remains available for the desktop app and reset utility.
 
@@ -161,7 +161,7 @@ Released under the MIT License. See [LICENSE](LICENSE). Third-party software is 
 Windows and browser-extension ZIPs are accompanied by `SHA256SUMS.txt`. After downloading, compare the file's SHA-256 digest with its line in the checksum file. For example:
 
 ```powershell
-Get-FileHash .\IB-Circlio-1.0.7-windows.zip -Algorithm SHA256
+Get-FileHash .\IB-Circlio-1.0.8-windows.zip -Algorithm SHA256
 ```
 
 The `VERSION` constant in `version.py` is the source version for the desktop app, local service, and portable build; the build synchronizes both packaged browser manifests to it.

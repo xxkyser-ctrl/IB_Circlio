@@ -12,7 +12,11 @@
 
 ## Local files and encryption
 
-The database, bearer token, archived profile pictures, settings, and exported workbooks are local files. They are **not encrypted** by the application; an encrypted-database option is planned but is not currently implemented. Protect the Windows account and any backups or exported workbooks. On POSIX systems, token and reset-password files are restricted to the current user. On Windows, keep the files in the user-local application data directory and protect the account that owns it.
+On Windows, new data folders use SQLCipher for the database and authenticated encryption for the local service token and archived profile pictures. Existing plaintext folders stay plaintext until the user explicitly migrates them. Migration creates a timestamped sibling backup and retains it unless the user confirms deletion. DPAPI protects keys for the current Windows account; passphrase mode and a one-time recovery key are also available. See [the encryption guide](docs/encryption.md) for details and limitations.
+
+Generated browser `config.js` files and exported Excel workbooks are plaintext by design and must be protected separately. Backups may contain plaintext data, and deleting files cannot guarantee forensic erasure. The reset utility clears records and archived pictures while retaining the database's active encryption metadata and key so the installation remains usable.
+
+Encryption protects data at rest while the protected key is unavailable. It does not protect data from malware or another process running as the same signed-in Windows user while the app is unlocked, nor does it encrypt files copied into a migration backup or exported workbook.
 
 The reset utility uses PBKDF2-HMAC-SHA256 with a per-file random salt and a high iteration count. Its password protects the reset operation; it does not encrypt the database.
 
@@ -20,7 +24,7 @@ The reset utility uses PBKDF2-HMAC-SHA256 with a per-file random salt and a high
 
 ## Third-party software and dependencies
 
-The bundled SheetJS library and its license are identified in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Python build dependencies are pinned in `requirements-build.txt`; run `py -3 -m pip_audit -r requirements-build.txt` to check them against known Python advisories.
+The bundled SheetJS library and the SQLCipher/cryptography dependencies are identified in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Python build dependencies are pinned in `requirements-build.txt`; run `py -3 -m pip_audit -r requirements-build.txt` to check them against known Python advisories.
 
 ## Reporting a vulnerability
 
@@ -33,7 +37,8 @@ Do not publish database files, tokens, screenshots containing usernames, or expo
 ## Safe release checklist
 
 - Run `py -3 -B -m unittest -q` and `py -3 -m pip_audit -r requirements-build.txt`.
-- Confirm `config.js`, `server-token.txt`, `*.db`, `*.db-*`, and `*.xlsx` are absent from all release assets.
+- Confirm config/token/key files, encryption metadata, `*.db`, `*.db-*`, avatar archives, and `*.xlsx` are absent from all release assets.
+- Test encrypted-database creation, migration in both directions, migration rollback, token/avatar authentication, and service operation using disposable data only.
 - Confirm Chromium and Firefox extension packages contain their correct manifests and no local token.
 - Verify the SHA-256 sums match each release asset.
 - Verify unauthenticated and wrong-token protected requests return `401`; invalid `Host` or `Origin` requests return `403`.

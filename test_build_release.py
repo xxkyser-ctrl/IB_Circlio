@@ -37,18 +37,26 @@ class BrowserPackageBuildTests(unittest.TestCase):
                     self.assertNotIn("config.js", archive.namelist())
                     self.assertNotIn("server-token.txt", archive.namelist())
 
-    def test_windows_package_rejects_local_config_and_token_files(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            package = root / "application"
-            package.mkdir()
-            (package / "config.js").write_text("secret", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "secret file"):
-                build_release.zip_windows_release(
-                    release_dir=package,
-                    release_root=root,
-                    version="1.0.0",
-                )
+    def test_packages_reject_local_data_and_secret_files(self):
+        for filename in (
+            "config.js",
+            "server-token.enc",
+            "encryption.json",
+            "master-key.dpapi",
+            "instagram.db",
+            "fixture.xlsx",
+        ):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                package = root / "application"
+                package.mkdir()
+                (package / filename).write_text("fixture secret", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "local data or secret"):
+                    build_release.zip_windows_release(
+                        release_dir=package,
+                        release_root=root,
+                        version="1.0.0",
+                    )
 
 
 if __name__ == "__main__":

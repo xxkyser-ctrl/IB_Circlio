@@ -170,12 +170,12 @@ class DesktopUpdateNoticeTests(unittest.TestCase):
     def test_newer_release_displays_notice_and_release_notes(self):
         with tempfile.TemporaryDirectory() as directory:
             app = self.make_app(directory)
-            parsed = release_check.parse_latest_release(release("v1.0.8"))
+            parsed = release_check.parse_latest_release(release("v1.0.9"))
             app._finish_update_check(False, parsed, None)
 
             self.assertEqual(
                 app.update_notice_heading.options["text"],
-                "Update available: v1.0.8",
+                "Update available: v1.0.9",
             )
             self.assertEqual(app.update_notes_view.content, "Release notes")
             self.assertTrue(app.update_notice.packed)

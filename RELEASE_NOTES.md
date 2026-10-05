@@ -1,3 +1,18 @@
+# IB Circlio v1.0.8
+
+## What's new
+
+- Encrypt new Windows databases with SQLCipher and encrypt archived profile pictures and the local service token with authenticated encryption.
+- Add Windows-account (DPAPI) and passphrase key protection, plus a one-time recovery key that can be copied or saved outside the PC.
+- Offer existing plaintext installations an explicit, verified migration with a sibling backup, and provide controls to enable or disable encryption later.
+- Decrypt profile pictures in memory for reports, and keep local reset operations within the existing encryption configuration.
+- Keep generated extension `config.js` and exported Excel workbooks readable; these files must be protected separately.
+
+## Important notes
+
+- A recovery key or intact backup is required if the Windows-protected key or passphrase is lost. Keep recovery material separate from the data folder.
+- Encryption does not retroactively protect retained migration backups, exported workbooks, or the plaintext extension configuration. The migration flow asks before deleting its specific backup; deleting files cannot guarantee forensic erasure.
+
 # IB Circlio v1.0.7
 
 ## What's new
@@ -10,7 +25,7 @@
 
 ## Important notes
 
-- The database, local token, avatar archive, and exported workbooks remain unencrypted. Database encryption is planned but is not available in this release.
+- The database, local token, avatar archive, and exported workbooks are not encrypted in v1.0.7. Encryption was added in v1.0.8.
 - Update checks are enabled by default and can be disabled separately in the desktop app and extension. They contact the public GitHub Releases API only and send no personal or collection data.
 
 # IB_Circlio v1.0.6

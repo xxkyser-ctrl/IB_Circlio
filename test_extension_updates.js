@@ -78,7 +78,7 @@ function createExtension(family, initialRelease, networkError = null) {
 
   const runtime = {
     lastError: null,
-    getManifest: () => ({ version: "1.0.7" }),
+    getManifest: () => ({ version: "1.0.8" }),
     onMessage: runtimeMessages,
     onInstalled: installed,
     onStartup: startup,
@@ -165,7 +165,7 @@ function createExtension(family, initialRelease, networkError = null) {
         };
       }
       if (url === "http://127.0.0.1:8765/version") {
-        return { ok: true, json: async () => ({ ok: true, version: "1.0.7" }) };
+        return { ok: true, json: async () => ({ ok: true, version: "1.0.8" }) };
       }
       throw new Error(`Unexpected fetch URL: ${url}`);
     },
@@ -236,7 +236,7 @@ function release(version) {
 
 for (const family of ["chrome", "firefox"]) {
   test(`${family}: newer release shows badge and popup banner; dismissal and toggle work`, async () => {
-    const extension = createExtension(family, release("1.0.8"));
+    const extension = createExtension(family, release("1.0.9"));
     await extension.fireInstalled();
     await extension.installPopup();
 
@@ -244,7 +244,7 @@ for (const family of ["chrome", "firefox"]) {
     assert.equal(extension.elements.get("update-banner").hidden, false);
     assert.equal(
       extension.elements.get("update-heading").textContent,
-      "Update available: v1.0.8"
+      "Update available: v1.0.9"
     );
 
     await extension.elements.get("dismiss-update").listeners.click();

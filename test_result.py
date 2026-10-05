@@ -1,6 +1,5 @@
 import contextlib
 import io
-import sqlite3
 import tempfile
 import unittest
 import zipfile
@@ -10,6 +9,7 @@ from unittest.mock import patch
 
 import result
 import result_gui
+import database as database_access
 import server
 
 
@@ -102,7 +102,7 @@ class SnapshotReportTests(unittest.TestCase):
 
     def test_database_data_version_detects_service_commits(self):
         database_path = Path(self.directory.name) / "instagram.db"
-        reader = sqlite3.connect(database_path)
+        reader = database_access.open_database(database_path, readonly=True)
         try:
             initial_version = result_gui.database_data_version(reader)
             self.save("2026-09-18T10:00:00+00:00", ["alice"], ["x"])

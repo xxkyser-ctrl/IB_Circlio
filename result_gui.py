@@ -2,8 +2,10 @@
 
 import argparse
 import ctypes
+import io
+import os
 import queue
-import sqlite3
+import shutil
 import subprocess
 import sys
 import threading
@@ -13,11 +15,14 @@ import webbrowser
 import zipfile
 from datetime import date, datetime, timezone
 from pathlib import Path
-from tkinter import filedialog, messagebox, scrolledtext, ttk
+from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 from urllib.error import URLError
 
 from PIL import Image, ImageDraw, ImageOps, ImageTk, UnidentifiedImageError
 
+import database as database_access
+import encryption
+from file_permissions import restrict_to_current_user
 import launcher
 from data_paths import default_data_dir
 import release_check
@@ -260,6 +265,7 @@ class CirclioReportApp:
         self.root = root
         self.connection = connection
         self.data_dir = Path(data_dir)
+        self.child_key_required = False
         self.app_directory = (
             Path(sys.executable).parent
             if getattr(sys, "frozen", False)
@@ -501,9 +507,9 @@ class CirclioReportApp:
         ).pack(anchor="w", pady=(4, 16))
         ttk.Label(
             tab,
-            text="Privacy note: the database, local token, archived pictures, and "
-            "exported workbooks are not encrypted. Encryption is planned but is "
-            "not currently available.",
+            text="Database encryption protects local records, cached pictures, "
+            "and the service token. Excel exports and browser-extension config "
+            "remain readable files.",
             style="Muted.TLabel",
             wraplength=850,
         ).pack(anchor="w", pady=(0, 12))
@@ -532,6 +538,21 @@ class CirclioReportApp:
         ttk.Button(
             controls, text="Refresh reports", command=self.refresh
         ).pack(side="right")
+
+        encryption_controls = ttk.Frame(tab)
+        encryption_controls.pack(fill="x", pady=(0, 12))
+        self.encryption_status = tk.StringVar()
+        ttk.Label(
+            encryption_controls,
+            textvariable=self.encryption_status,
+            style="Section.TLabel",
+        ).pack(side="left")
+        ttk.Button(
+            encryption_controls,
+            text="Manage local encryption",
+            command=self._manage_encryption,
+        ).pack(side="right")
+        self._update_encryption_status()
 
         update_controls = ttk.Frame(tab)
         update_controls.pack(fill="x", pady=(0, 8))
@@ -689,16 +710,101 @@ class CirclioReportApp:
         self.server_log_view.see("end")
         self.server_log_view.configure(state="disabled")
 
+    def _update_encryption_status(self):
+        encrypted = encryption.load_metadata(self.data_dir) is not None
+        self.encryption_status.set(
+            "Local database encryption: on" if encrypted
+            else "Local database encryption: off"
+        )
+
+    def _manage_encryption(self):
+        if self.server_process and self.server_process.poll() is None:
+            return self._error("Stop the collection service before changing encryption.")
+        encrypted = encryption.load_metadata(self.data_dir) is not None
+        if encrypted:
+            confirmed = messagebox.askyesno(
+                "Disable local encryption",
+                "This will create a backup, then convert the database and cached "
+                "pictures to plaintext. Continue?",
+                parent=self.root,
+            )
+            operation = database_access.disable_encryption
+        else:
+            confirmed = messagebox.askyesno(
+                "Enable local encryption",
+                "This will create a backup, then encrypt the database, cached "
+                "pictures, and service token. Continue?",
+                parent=self.root,
+            )
+            operation = _enable_encryption_from_ui
+        if not confirmed:
+            return
+
+        self.connection.close()
+        result_data = None
+        operation_error = None
+        try:
+            result_data = operation(self.root, self.data_dir) if not encrypted else operation(self.data_dir)
+        except (
+            OSError,
+            ValueError,
+            *database_access.SQLITE_ERRORS,
+        ) as error:
+            operation_error = error
+        try:
+            self.connection = database_access.open_database(
+                self.data_dir / "instagram.db", readonly=True, create=False
+            )
+        except (OSError, ValueError, *database_access.SQLITE_ERRORS) as error:
+            return self._error(
+                "Could not reopen the data folder after the encryption operation. "
+                f"Preserve the migration backup and contact support:\n{error}"
+            )
+        if operation_error:
+            return self._error(f"Could not change local encryption:\n{operation_error}")
+        self._update_encryption_status()
+        metadata = encryption.load_metadata(self.data_dir)
+        self.child_key_required = bool(
+            metadata and metadata["key_mode"] == "passphrase"
+        )
+        self.refresh()
+        if result_data.get("recovery_key"):
+            _show_recovery_key(self.root, result_data["recovery_key"])
+        backup = Path(result_data["backup"])
+        messagebox.showinfo(
+            "Encryption updated",
+            f"Migration completed and verified.\nBackup retained at:\n{backup}",
+            parent=self.root,
+        )
+        if messagebox.askyesno(
+            "Delete migration backup?",
+            "The backup contains a copy of your data. Delete this exact backup "
+            "folder now? This cannot be undone.",
+            parent=self.root,
+        ):
+            try:
+                shutil.rmtree(backup)
+            except OSError as error:
+                self._error(f"Could not delete the migration backup:\n{error}")
+
     def _start_server(self):
         if self.server_process and self.server_process.poll() is None:
             return
-        token_path = self.data_dir / "server-token.txt"
+        token_path = self.data_dir / encryption.TOKEN_NAME
         config_path = self.app_directory / "config.js"
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
-            launcher.prepare_extension_configs(
+            token_path = launcher.prepare_extension_configs(
                 self.data_dir, self.app_directory
             )
+            child_environment = os.environ.copy()
+            metadata = encryption.load_metadata(self.data_dir)
+            if metadata and (
+                metadata["key_mode"] == "passphrase" or self.child_key_required
+            ):
+                child_environment["IB_CIRCLIO_KEY"] = encryption.load_master_key(
+                    self.data_dir
+                ).hex()
             packaged_server = self.app_directory / "ib-circlio-server.exe"
             if packaged_server.is_file():
                 command = [
@@ -729,6 +835,7 @@ class CirclioReportApp:
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
+                env=child_environment,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except (OSError, ValueError) as error:
@@ -817,13 +924,13 @@ class CirclioReportApp:
             self.next_report_check = now + REPORT_REFRESH_CHECK_SECONDS
             try:
                 current_version = database_data_version(self.connection)
-            except sqlite3.Error as error:
+            except database_access.SQLITE_ERRORS as error:
                 self._append_server_log(f"Could not check for report updates: {error}")
             else:
                 if current_version != self.last_database_version:
                     try:
                         self.refresh()
-                    except sqlite3.Error as error:
+                    except database_access.SQLITE_ERRORS as error:
                         self._append_server_log(f"Could not refresh reports: {error}")
                     else:
                         self.last_database_version = current_version
@@ -1160,10 +1267,12 @@ class CirclioReportApp:
         if not image_path or not Path(image_path).is_file():
             return
         try:
-            with Image.open(image_path) as source:
+            with Image.open(
+                io.BytesIO(encryption.read_avatar(image_path, self.data_dir))
+            ) as source:
                 image = ImageOps.contain(source.convert("RGB"), (560, 560))
             photo = ImageTk.PhotoImage(image)
-        except (OSError, UnidentifiedImageError) as error:
+        except (OSError, UnidentifiedImageError, ValueError) as error:
             return self._error(f"Could not open this profile image:\n{error}")
         window = tk.Toplevel(self.root)
         window.title("Profile picture")
@@ -1553,12 +1662,14 @@ class CirclioReportApp:
             return self.avatar_photos[image_path]
         if image_path and image_path not in self.avatar_errors:
             try:
-                with Image.open(image_path) as source:
+                with Image.open(
+                    io.BytesIO(encryption.read_avatar(image_path, self.data_dir))
+                ) as source:
                     image = ImageOps.fit(source.convert("RGB"), (36, 36))
                 photo = ImageTk.PhotoImage(image, master=self.root)
                 self.avatar_photos[image_path] = photo
                 return photo
-            except (OSError, UnidentifiedImageError, tk.TclError):
+            except (OSError, UnidentifiedImageError, tk.TclError, ValueError):
                 self.avatar_errors.add(image_path)
         return self._placeholder_photo()
 
@@ -1609,7 +1720,7 @@ class CirclioReportApp:
                     self.connection, self.profile.get(), collection[0]
                 )
             )
-        except (OSError, sqlite3.Error, ValueError) as error:
+        except (OSError, ValueError, *database_access.SQLITE_ERRORS) as error:
             return self._error(f"Could not create the workbook:\n{error}")
         messagebox.showinfo("Excel report created", f"Saved report to:\n{output}", parent=self.root)
 
@@ -1636,6 +1747,136 @@ def format_timestamp(value):
         return value
 
 
+def _enable_encryption_from_ui(parent, data_dir):
+    use_passphrase = messagebox.askyesno(
+        "Choose encryption protection",
+        "Use a passphrase to protect the encryption key? Choose No to protect it "
+        "with this Windows account (DPAPI).",
+        parent=parent,
+    )
+    if not use_passphrase:
+        return database_access.enable_encryption(data_dir)
+    passphrase = simpledialog.askstring(
+        "Set encryption passphrase",
+        "Enter a passphrase (at least 12 characters):",
+        show="*",
+        parent=parent,
+    )
+    confirmation = simpledialog.askstring(
+        "Confirm encryption passphrase",
+        "Enter the passphrase again:",
+        show="*",
+        parent=parent,
+    )
+    if not passphrase or len(passphrase) < 12 or passphrase != confirmation:
+        raise encryption.EncryptionError(
+            "The passphrases were empty, too short, or did not match."
+        )
+    return database_access.enable_encryption(
+        data_dir, mode="passphrase", passphrase=passphrase
+    )
+
+
+def _show_recovery_key(parent, recovery_key):
+    window = tk.Toplevel(parent)
+    window.title("Save your IB Circlio recovery key")
+    window.transient(parent)
+    window.resizable(False, False)
+    ttk.Label(
+        window,
+        text="This key is shown only once. Save it somewhere separate from this PC. "
+        "Anyone with the key and a copy of your data can unlock that data.",
+        wraplength=520,
+    ).pack(padx=18, pady=(18, 10))
+    value = tk.StringVar(value=recovery_key)
+    entry = ttk.Entry(window, textvariable=value, width=58, state="readonly")
+    entry.pack(padx=18, pady=6)
+
+    def copy_key():
+        window.clipboard_clear()
+        window.clipboard_append(recovery_key)
+        messagebox.showinfo("Recovery key copied", "The key is on your clipboard.", parent=window)
+
+    def save_key():
+        destination = filedialog.asksaveasfilename(
+            parent=window,
+            title="Save recovery key",
+            initialfile="ib-circlio-recovery-key.txt",
+            defaultextension=".txt",
+            filetypes=(("Text files", "*.txt"),),
+        )
+        if not destination:
+            return
+        path = Path(destination)
+        try:
+            path.write_text(recovery_key + "\n", encoding="utf-8")
+            restrict_to_current_user(path)
+        except OSError as error:
+            messagebox.showerror(
+                "Could not save recovery key", str(error), parent=window
+            )
+            return
+        messagebox.showinfo(
+            "Recovery key saved", f"Saved recovery key to:\n{path}", parent=window
+        )
+
+    actions = ttk.Frame(window)
+    actions.pack(padx=18, pady=(8, 18))
+    ttk.Button(actions, text="Copy key", command=copy_key).pack(side="left", padx=4)
+    ttk.Button(actions, text="Save to file", command=save_key).pack(side="left", padx=4)
+    ttk.Button(actions, text="Done", command=window.destroy).pack(side="left", padx=4)
+    window.grab_set()
+    parent.wait_window(window)
+
+
+def _unlock_passphrase_data(root, data_dir):
+    metadata = encryption.load_metadata(data_dir)
+    if not metadata:
+        return False
+    unlock_error = None
+    try:
+        if metadata["key_mode"] == "dpapi":
+            encryption.load_master_key(data_dir)
+            return False
+        passphrase = simpledialog.askstring(
+            "Unlock IB Circlio data",
+            "Enter the data-encryption passphrase:",
+            show="*",
+            parent=root,
+        )
+        if passphrase:
+            try:
+                encryption.load_master_key(data_dir, passphrase=passphrase)
+                return True
+            except encryption.EncryptionError as error:
+                unlock_error = error
+    except (encryption.MissingKeyError, OSError) as error:
+        unlock_error = error
+
+    if not messagebox.askyesno(
+        "Unlock with recovery key",
+        "The data key could not be opened. Use your saved recovery key instead?",
+        parent=root,
+    ):
+        raise encryption.MissingKeyError(
+            "The encrypted data requires a valid passphrase or recovery key."
+        ) from unlock_error
+    recovery_key = simpledialog.askstring(
+        "Unlock with recovery key",
+        "Enter the saved recovery key:",
+        parent=root,
+    )
+    if not recovery_key:
+        raise encryption.MissingKeyError("A recovery key is required.")
+    try:
+        encryption.load_master_key(data_dir, recovery_key=recovery_key)
+    except encryption.EncryptionError as error:
+        raise encryption.EncryptionError(
+            "The recovery key is incorrect or the key envelope is damaged."
+        ) from error
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="IB_Circlio desktop application")
     parser.add_argument(
@@ -1656,11 +1897,59 @@ def main():
     root = tk.Tk()
     try:
         data_dir.mkdir(parents=True, exist_ok=True)
+        was_plaintext = (
+            database_path.is_file()
+            and encryption.load_metadata(data_dir) is None
+        )
+        child_key_required = _unlock_passphrase_data(root, data_dir)
         database = server.Database(str(database_path))
         database.close()
-        connection = sqlite3.connect(f"{database_path.as_uri()}?mode=ro", uri=True)
-        connection.row_factory = sqlite3.Row
+        recovery_key = database_access.take_pending_recovery_key(data_dir)
+        migration_backup = None
+        if was_plaintext and messagebox.askyesno(
+            "Protect local data",
+            "This existing data folder is not encrypted. Would you like to create "
+            "a verified backup and enable encryption now?",
+            parent=root,
+        ):
+            try:
+                migration = _enable_encryption_from_ui(root, data_dir)
+            except (OSError, ValueError, *database_access.SQLITE_ERRORS) as error:
+                messagebox.showerror(
+                    "Encryption was not enabled",
+                    f"The existing data remains available:\n{error}",
+                    parent=root,
+                )
+            else:
+                recovery_key = migration["recovery_key"]
+                migration_backup = Path(migration["backup"])
+        if recovery_key:
+            _show_recovery_key(root, recovery_key)
+        if migration_backup:
+            messagebox.showinfo(
+                "Encryption enabled",
+                f"Migration completed and verified.\nBackup retained at:\n{migration_backup}",
+                parent=root,
+            )
+            if messagebox.askyesno(
+                "Delete migration backup?",
+                "The backup contains a copy of your data. Delete this exact backup "
+                "folder now? This cannot be undone.",
+                parent=root,
+            ):
+                try:
+                    shutil.rmtree(migration_backup)
+                except OSError as error:
+                    messagebox.showerror(
+                        "Could not delete the migration backup",
+                        str(error),
+                        parent=root,
+                    )
+        connection = database_access.open_database(
+            database_path, readonly=True, create=False
+        )
         app = CirclioReportApp(root, connection, data_dir)
+        app.child_key_required = child_key_required
         if not app.profile_values:
             messagebox.showinfo(
                 "Welcome to IB_Circlio",
@@ -1669,7 +1958,12 @@ def main():
                 parent=root,
             )
         root.mainloop()
-    except (OSError, sqlite3.Error, tk.TclError, ValueError) as error:
+    except (
+        OSError,
+        tk.TclError,
+        ValueError,
+        *database_access.SQLITE_ERRORS,
+    ) as error:
         messagebox.showerror("IB_Circlio could not start", str(error), parent=root)
         root.destroy()
 

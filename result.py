@@ -1,12 +1,12 @@
 """Local reports, snapshot browsing, and comparisons."""
 
 import argparse
-import sqlite3
 import zipfile
 from html import escape
 from datetime import datetime, date
 from pathlib import Path
 
+import database as database_access
 
 def excel_safe_text(value):
     text = "" if value is None else str(value)
@@ -566,7 +566,7 @@ def main():
     database = Path(args.data_dir) / "instagram.db"
     if not database.exists():
         raise ValueError("The SQLite database does not exist.")
-    connection = sqlite3.connect(database)
+    connection = database_access.open_database(database, readonly=True, create=False)
     try:
         profile = choose_profile(connection, args.profile)
         if args.command == "browse":
@@ -586,6 +586,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, IndexError, sqlite3.Error) as error:
+    except (OSError, ValueError, IndexError, *database_access.SQLITE_ERRORS) as error:
         print(f"Error: {error}")
         raise SystemExit(1)

@@ -18,6 +18,26 @@ DIST_DIR = BUILD_DIR / "dist"
 RELEASE_DIR = ROOT / "release" / RELEASE_NAME
 RELEASE_ROOT = ROOT / "release"
 
+LOCAL_DATA_NAMES = {
+    "config.js",
+    "server-token.txt",
+    "server-token.enc",
+    "encryption.json",
+    "master-key.dpapi",
+    "migration.json",
+    "service.lock",
+    "clear-password.txt",
+}
+LOCAL_DATA_SUFFIXES = {".db", ".db-shm", ".db-wal", ".xlsx"}
+
+
+def _is_local_data_file(path):
+    return (
+        path.name in LOCAL_DATA_NAMES
+        or path.suffix.casefold() in LOCAL_DATA_SUFFIXES
+        or any(part.casefold() == "avatars" for part in path.parts)
+    )
+
 
 def run_pyinstaller(script, name, windowed=False):
     interface_mode = "--windowed" if windowed else "--console"
@@ -39,6 +59,14 @@ def run_pyinstaller(script, name, windowed=False):
         str(BUILD_DIR),
         str(ROOT / script),
     ]
+    command.extend(
+        [
+            "--collect-all",
+            "sqlcipher3",
+            "--collect-all",
+            "cryptography",
+        ]
+    )
     if windowed:
         command.extend(["--icon", str(ROOT / "icons" / "ib-circlio.ico")])
     subprocess.run(command, cwd=ROOT, check=True)
@@ -79,6 +107,10 @@ def zip_extension_directory(
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(extension_dir.rglob("*")):
             if path.is_file():
+                if _is_local_data_file(path):
+                    raise ValueError(
+                        f"Refusing to package local data or secret file: {path}"
+                    )
                 archive.write(path, path.relative_to(extension_dir))
     return output
 
@@ -90,9 +122,9 @@ def zip_windows_release(
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(release_dir.rglob("*")):
             if path.is_file():
-                if path.name in ("config.js", "server-token.txt"):
+                if _is_local_data_file(path):
                     raise ValueError(
-                        f"Refusing to package local secret file: {path}"
+                        f"Refusing to package local data or secret file: {path}"
                     )
                 archive.write(path, path.relative_to(release_dir.parent))
     return output
@@ -138,6 +170,8 @@ def main():
         "release_check.py",
         "data_paths.py",
         "file_permissions.py",
+        "database.py",
+        "encryption.py",
         "launcher.py",
         "server.py",
         "result.py",
@@ -158,9 +192,12 @@ def main():
         )
     shutil.copytree(ROOT / "icons", RELEASE_DIR / "icons")
     shutil.copytree(ROOT / "vendor", RELEASE_DIR / "vendor")
+    package_docs = RELEASE_DIR / "docs"
+    package_docs.mkdir(exist_ok=True)
+    shutil.copy2(ROOT / "docs" / "encryption.md", package_docs / "encryption.md")
     if (ROOT / "docs" / "screenshots").exists():
         shutil.copytree(
-            ROOT / "docs" / "screenshots", RELEASE_DIR / "docs" / "screenshots"
+            ROOT / "docs" / "screenshots", package_docs / "screenshots"
         )
     chromium_dir = build_extension_directory("manifest.json", "chromium")
     firefox_dir = build_extension_directory("manifest.firefox.json", "firefox")

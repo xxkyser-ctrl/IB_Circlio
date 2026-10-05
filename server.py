@@ -20,6 +20,8 @@ from urllib.parse import parse_qs, urlparse
 
 from PIL import Image
 
+import database as database_access
+import encryption
 from data_paths import default_data_dir
 from version import VERSION
 
@@ -166,9 +168,8 @@ def synchronized(method):
 class Database:
     def __init__(self, path=DEFAULT_DB_PATH):
         self.path = path
-        self.connection = sqlite3.connect(path, check_same_thread=False)
+        self.connection = database_access.open_database(path)
         self.lock = threading.RLock()
-        self.connection.row_factory = sqlite3.Row
         self.connection.executescript(SCHEMA)
         for column in (
             "followers_header_total", "following_header_total",
@@ -178,17 +179,17 @@ class Database:
                 self.connection.execute(
                     f"ALTER TABLE collections ADD COLUMN {column} INTEGER"
                 )
-            except sqlite3.OperationalError:
+            except database_access.SQLITE_OPERATIONAL_ERRORS:
                 pass
         try:
             self.connection.execute(
                 "ALTER TABLE collections ADD COLUMN complete INTEGER NOT NULL DEFAULT 1"
             )
-        except sqlite3.OperationalError:
+        except database_access.SQLITE_OPERATIONAL_ERRORS:
             pass
         try:
             self.connection.execute("ALTER TABLE users ADD COLUMN avatar_path TEXT")
-        except sqlite3.OperationalError:
+        except database_access.SQLITE_OPERATIONAL_ERRORS:
             pass
         self.connection.commit()
 
@@ -403,6 +404,11 @@ class Database:
                 f"{username}:{source_url}:{version}".encode("utf-8")
             ).hexdigest()[:32]
             destination = os.path.join(avatar_dir, f"{digest}{suffix}")
+            data_dir = os.path.dirname(os.path.abspath(self.path))
+            if encryption.is_encrypted(data_dir):
+                data = encryption.encrypt_avatar(
+                    data, encryption.load_master_key(data_dir)
+                )
             with open(destination, "wb") as image_file:
                 image_file.write(data)
             now = datetime.now(timezone.utc).isoformat()
@@ -665,28 +671,48 @@ def main():
     token = args.token
     if args.token_file:
         try:
-            with open(args.token_file, "r", encoding="utf-8") as token_file:
-                token = token_file.read().strip()
-        except OSError as error:
+            token_path = os.path.abspath(args.token_file)
+            if os.path.basename(token_path) == encryption.TOKEN_NAME:
+                token = encryption.read_token(os.path.dirname(token_path))
+            else:
+                with open(token_path, "r", encoding="utf-8") as token_file:
+                    token = token_file.read().strip()
+        except (OSError, ValueError) as error:
             parser.error(f"cannot read token file: {error}")
     if not token or len(token) < 32 or any(character.isspace() for character in token):
         parser.error("a random token of at least 32 characters is required")
     os.makedirs(os.path.dirname(os.path.abspath(args.db)), exist_ok=True)
-    database = Database(args.db)
-    Handler.db = database
-    Handler.token = token
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(
-        f"IB_Circlio collection service listening on http://127.0.0.1:{args.port}",
-        flush=True,
+    lock_handle = database_access.acquire_service_lock(
+        os.path.dirname(os.path.abspath(args.db))
     )
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        database = Database(args.db)
+        recovery_key = database_access.take_pending_recovery_key(
+            os.path.dirname(os.path.abspath(args.db))
+        )
+        if recovery_key:
+            print(
+                "IMPORTANT: Save this one-time IB Circlio recovery key outside this PC:\n"
+                f"{recovery_key}\n"
+                "It cannot be displayed again.",
+                flush=True,
+            )
+        Handler.db = database
+        Handler.token = token
+        http_server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+        print(
+            f"IB_Circlio collection service listening on http://127.0.0.1:{args.port}",
+            flush=True,
+        )
+        try:
+            http_server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            http_server.server_close()
+            database.close()
     finally:
-        server.server_close()
-        database.close()
+        database_access.release_service_lock(lock_handle)
 
 
 if __name__ == "__main__":
