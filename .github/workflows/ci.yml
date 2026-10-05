@@ -17,10 +17,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install pinned build dependencies
         run: py -3 -m pip install -r requirements-build.txt
       - name: Run test suite
         run: py -3 -B -m unittest -q
+      - name: Test browser update notifications
+        run: node --test test_extension_updates.js
       - name: Audit Python dependencies
         run: |
           py -3 -m pip install pip-audit

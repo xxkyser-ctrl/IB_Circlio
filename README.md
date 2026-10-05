@@ -68,6 +68,7 @@ The source checkout includes `manifest.firefox.json` for temporary Firefox add-o
 - Windows
 - Git
 - Python 3.13 or later
+- Node.js 22 (to run the browser update-notification tests)
 - Chrome, Edge, Brave, Opera, another Chromium browser, or Firefox
 
 ### Set up and run from source
@@ -91,6 +92,7 @@ Run the tests and build the portable Windows package with:
 
 ```powershell
 py -3 -B -m unittest -q
+node --test test_extension_updates.js
 py -3 -B build_release.py
 ```
 
@@ -107,7 +109,7 @@ The build uses `requirements-build.txt` and writes version-specific output benea
 | `manifest.json` | Chromium extension manifest |
 | `manifest.firefox.json` | Firefox manifest; see the compatibility note above |
 | `release_check.py`, `version.py`, `data_paths.py`, `file_permissions.py` | Update checks, canonical version, local data paths, and secret-file permissions |
-| `test_server.py`, `test_result.py`, `test_updates.py`, `test_data_paths.py`, `test_file_permissions.py`, `test_build_release.py` | Automated tests |
+| `test_server.py`, `test_result.py`, `test_updates.py`, `test_extension_updates.js`, `test_data_paths.py`, `test_file_permissions.py`, `test_build_release.py` | Automated tests |
 | `docs/` | Project website, architecture diagram, and existing screenshots |
 
 ## Local data and privacy
@@ -163,6 +165,8 @@ Get-FileHash .\IB-Circlio-1.0.7-windows.zip -Algorithm SHA256
 ```
 
 The `VERSION` constant in `version.py` is the source version for the desktop app, local service, and portable build; the build synchronizes both packaged browser manifests to it.
+
+See [docs/releasing.md](docs/releasing.md) for the versioning, testing, and GitHub Release publishing checklist.
 
 ## Links
 

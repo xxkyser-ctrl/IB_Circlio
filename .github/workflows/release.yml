@@ -15,6 +15,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Verify tag matches canonical application version
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          py -3 -c "import os; from version import VERSION; tag = os.environ['GITHUB_REF_NAME']; expected = f'v{VERSION}'; assert tag == expected, f'Expected tag {expected}, got {tag}'"
       - name: Install pinned build dependencies
         run: py -3 -m pip install -r requirements-build.txt
       - name: Run test suite
@@ -32,17 +37,36 @@ jobs:
               throw "Checksum mismatch for $($parts[1])"
             }
           }
+      - name: Prepare tag-specific release notes
+        shell: pwsh
+        run: |
+          $tag = [regex]::Escape($env:GITHUB_REF_NAME)
+          $notes = Get-Content RELEASE_NOTES.md -Raw
+          $section = [regex]::Match($notes, "(?ms)^# IB Circlio $tag\r?\n.*?(?=^# |\z)")
+          if (-not $section.Success) {
+            throw "No release-notes section found for $env:GITHUB_REF_NAME"
+          }
+          Set-Content release\release-notes.md $section.Value.Trim() -NoNewline
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $assets = @(
-            Get-ChildItem release -File |
-              Where-Object { $_.Name -match '^IB-Circlio-.*-(windows|chromium-extension|firefox-extension)\.zip$' } |
-              ForEach-Object { $_.FullName }
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $expectedAssets = @(
+            "IB-Circlio-$version-windows.zip",
+            "IB-Circlio-$version-chromium-extension.zip",
+            "IB-Circlio-$version-firefox-extension.zip",
+            "SHA256SUMS.txt"
           )
-          $assets += (Resolve-Path release\SHA256SUMS.txt).Path
+          foreach ($asset in $expectedAssets) {
+            if (-not (Test-Path "release\$asset")) {
+              throw "Expected release asset is missing: $asset"
+            }
+          }
+          $assets = @(
+            $expectedAssets | ForEach-Object { (Resolve-Path "release\$_").Path }
+          )
           gh release create $env:GITHUB_REF_NAME $assets `
             --title "IB Circlio $env:GITHUB_REF_NAME" `
-            --notes-file RELEASE_NOTES.md
+            --notes-file release\release-notes.md
