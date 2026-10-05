@@ -262,19 +262,32 @@ for (const family of ["chrome", "firefox"]) {
     await extension.elements.get("check-updates").listeners.change.call(
       Object.assign(extension.elements.get("check-updates"), { checked: true })
     );
-    assert.equal(extension.action.badge, "NEW");
-    assert.equal(extension.elements.get("update-banner").hidden, false);
-    assert.equal(
-      extension.elements.get("update-heading").textContent,
-      "Update available: v1.0.9"
-    );
+    assert.equal(extension.counters.releaseFetches, checksBeforeDisable + 1);
+    assert.equal(extension.action.badge, "");
+    assert.equal(extension.elements.get("update-banner").hidden, true);
 
-    const checksBeforeSecondDisable = extension.counters.releaseFetches;
     await extension.elements.get("check-updates").listeners.change.call(
       Object.assign(extension.elements.get("check-updates"), { checked: false })
     );
     assert.equal(extension.alarms.size, 0);
-    assert.equal(extension.counters.releaseFetches, checksBeforeSecondDisable);
+
+    extension.setRelease(release("1.0.10"));
+    await extension.elements.get("check-updates").listeners.change.call(
+      Object.assign(extension.elements.get("check-updates"), { checked: true })
+    );
+    assert.equal(extension.action.badge, "NEW");
+    assert.equal(extension.elements.get("update-banner").hidden, false);
+    assert.equal(
+      extension.elements.get("update-heading").textContent,
+      "Update available: v1.0.10"
+    );
+
+    const checksBeforeFinalDisable = extension.counters.releaseFetches;
+    await extension.elements.get("check-updates").listeners.change.call(
+      Object.assign(extension.elements.get("check-updates"), { checked: false })
+    );
+    assert.equal(extension.alarms.size, 0);
+    assert.equal(extension.counters.releaseFetches, checksBeforeFinalDisable);
     assert.equal(extension.elements.get("update-banner").hidden, true);
   });
 
