@@ -24,6 +24,7 @@ class BrowserPackageBuildTests(unittest.TestCase):
                 )
                 self.assertEqual(manifest["version"], VERSION)
                 self.assertTrue((extension / "LICENSE").is_file())
+                self.assertTrue((extension / "THIRD_PARTY_NOTICES.md").is_file())
                 self.assertFalse((extension / "config.js").exists())
 
                 archive_path = build_release.zip_extension_directory(
@@ -32,6 +33,7 @@ class BrowserPackageBuildTests(unittest.TestCase):
                 with zipfile.ZipFile(archive_path) as archive:
                     self.assertIn("manifest.json", archive.namelist())
                     self.assertIn("LICENSE", archive.namelist())
+                    self.assertIn("THIRD_PARTY_NOTICES.md", archive.namelist())
                     self.assertNotIn("config.js", archive.namelist())
                     self.assertNotIn("server-token.txt", archive.namelist())
 

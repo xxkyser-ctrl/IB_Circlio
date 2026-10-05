@@ -58,6 +58,9 @@ def build_extension_directory(manifest_name, family, output_root=RELEASE_DIR):
         shutil.copy2(ROOT / filename, extension_dir / filename)
     shutil.copytree(ROOT / "icons", extension_dir / "icons")
     shutil.copy2(ROOT / "LICENSE", extension_dir / "LICENSE")
+    shutil.copy2(
+        ROOT / "THIRD_PARTY_NOTICES.md", extension_dir / "THIRD_PARTY_NOTICES.md"
+    )
     (extension_dir / "README.txt").write_text(
         "Extract this directory as extensions\\" + family + " inside the IB Circlio "
         "Windows package. Start ib_circlio.exe before loading the extension so the "
