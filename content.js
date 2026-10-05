@@ -1,3 +1,5 @@
+const ext = globalThis.browser ?? globalThis.chrome;
+
 (() => {
   const state = {
     stopRequested: false,
@@ -8,6 +10,17 @@
     "accounts", "direct", "explore", "reel", "reels", "stories", "p", "tv", "create"
   ]);
   const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+  function sendRuntimeMessage(message) {
+    if (globalThis.browser) return ext.runtime.sendMessage(message);
+    return new Promise((resolve, reject) => {
+      ext.runtime.sendMessage(message, (response) => {
+        const error = ext.runtime.lastError;
+        if (error) reject(new Error(error.message));
+        else resolve(response);
+      });
+    });
+  }
 
   function usernameFromHref(href) {
     if (!href) return null;
@@ -307,28 +320,21 @@
     if (result.error) result.complete = false;
 
     try {
-      const saveResponse = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({
-          action: "saveCollection",
-          collection: {
-            profile: location.pathname.replace(/^\/|\/$/g, ""),
-            followers: result.followers,
-            following: result.following,
-            avatars: result.avatars,
-            headerTotals: result.headerTotals,
-            headerTotalLabels: result.headerTotalLabels,
-            complete: result.complete
-          }
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (!response?.ok) {
-            reject(new Error(response?.error || "Could not save the collection."));
-          } else {
-            resolve(response);
-          }
-        });
+      const saveResponse = await sendRuntimeMessage({
+        action: "saveCollection",
+        collection: {
+          profile: location.pathname.replace(/^\/|\/$/g, ""),
+          followers: result.followers,
+          following: result.following,
+          avatars: result.avatars,
+          headerTotals: result.headerTotals,
+          headerTotalLabels: result.headerTotalLabels,
+          complete: result.complete
+        }
       });
+      if (!saveResponse?.ok) {
+        throw new Error(saveResponse?.error || "Could not save the collection.");
+      }
       const collection = saveResponse.collection;
       const status = result.error
         ? `Partial snapshot saved: ${result.error}`
@@ -353,13 +359,13 @@
   function sendCollectionState(active, status, details = {}) {
     state.running = active;
     state.status = status;
-    chrome.runtime.sendMessage({
+    sendRuntimeMessage({
       action: "collectionState",
       state: { active, status, ...details }
     }).catch(() => {});
   }
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  ext.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.action === "getCollectionState") {
       sendResponse({
         ok: true,

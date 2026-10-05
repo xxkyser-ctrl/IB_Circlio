@@ -6,23 +6,37 @@
   <title>IB Circlio</title>
   <style>
     :root { color-scheme: light; font-family: Arial, sans-serif; }
-    body { width: 300px; margin: 0; padding: 18px; color: #202124; background: #fff; }
-    h1 { margin: 0 0 18px; font-size: 20px; }
+    body { width: 320px; max-height: 600px; overflow-y: auto; margin: 0; padding: 18px; color: #202124; background: #fff; }
+    h1 { margin: 0 0 12px; font-size: 20px; }
     button { width: 100%; margin: 4px 0; padding: 9px 10px; border: 1px solid #dadce0; border-radius: 6px; background: #f8f9fa; cursor: pointer; }
     #start { color: #fff; background: #0095f6; border-color: #0095f6; font-weight: 600; }
     button:hover { background: #eef0f2; }
     button:disabled { opacity: .5; cursor: default; }
     #stop { background: #fff1f0; border-color: #f0aca7; }
     #status { min-height: 36px; padding: 10px; border-radius: 6px; background: #f1f3f4; font-size: 12px; line-height: 1.45; }
+    #update-banner { margin: 8px 0; padding: 10px; border: 1px solid #c9d2ff; border-radius: 6px; background: #f3f5ff; }
+    #update-banner h2 { margin: 0 0 6px; font-size: 14px; }
+    #release-notes { max-height: 110px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.4; }
+    #version-mismatch { padding: 8px; border-radius: 6px; background: #fff1f0; color: #8b2525; font-size: 12px; }
+    #update-settings { display: block; margin-top: 8px; font-size: 12px; }
+    #update-settings input { vertical-align: middle; }
     footer { margin-top: 14px; color: #6b7280; font-size: 11px; text-align: center; }
   </style>
 </head>
 <body>
   <h1>IB Circlio</h1>
+  <div id="version-mismatch" hidden>Extension and desktop app versions differ. Please update both.</div>
+  <section id="update-banner" hidden>
+    <h2 id="update-heading"></h2>
+    <div id="release-notes"></div>
+    <button id="open-release" type="button">Open release page</button>
+    <button id="dismiss-update" type="button">Dismiss</button>
+  </section>
   <button id="start" type="button">Start collection</button>
   <div id="status">Ready to collect the current profile.</div>
   <button id="stop" type="button" disabled>Stop</button>
   <button id="feedback" type="button">Feedback / suggestions</button>
+  <label id="update-settings"><input id="check-updates" type="checkbox" checked> Check for updates</label>
   <footer>Developed by Ilyas IB</footer>
   <script src="popup.js"></script>
 </body>

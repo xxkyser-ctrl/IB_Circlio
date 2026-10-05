@@ -9,16 +9,21 @@ import sys
 import threading
 import time
 import tkinter as tk
+import webbrowser
 import zipfile
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
+from urllib.error import URLError
 
 from PIL import Image, ImageDraw, ImageOps, ImageTk, UnidentifiedImageError
 
 import launcher
+from data_paths import default_data_dir
+import release_check
 import result
 import server
+from version import VERSION
 
 
 BACKGROUND = "#f3f5f9"
@@ -266,6 +271,23 @@ class CirclioReportApp:
         self.next_report_check = 0.0
         self.avatar_window = None
         self.server_messages = queue.Queue()
+        self.update_settings_path = self.data_dir / "settings.json"
+        self.update_settings_error = None
+        try:
+            self.update_settings = release_check.load_settings(
+                self.update_settings_path
+            )
+        except (OSError, ValueError) as error:
+            self.update_settings = release_check.default_settings()
+            self.update_settings_error = str(error)
+        self.auto_updates = tk.BooleanVar(
+            value=self.update_settings["automatic_updates"]
+        )
+        self.update_check_running = False
+        self.update_check_button = None
+        self.update_status_label = None
+        self.update_notice = None
+        self.update_release_button = None
         self.server_status = tk.StringVar(value="Stopped")
         self.server_start_button = None
         self.server_stop_button = None
@@ -301,8 +323,8 @@ class CirclioReportApp:
         self.root.bind_all("<Button-1>", self._close_avatar_on_app_click, add="+")
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
-            launcher.prepare_local_config(
-                self.data_dir, self.app_directory / "config.js"
+            launcher.prepare_extension_configs(
+                self.data_dir, self.app_directory
             )
         except OSError as error:
             self._append_server_log(f"Could not prepare local configuration: {error}")
@@ -313,6 +335,17 @@ class CirclioReportApp:
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.after(200, self._poll_server)
         self.root.after(1000, self._poll_reports)
+        if self.update_settings_error:
+            self._append_server_log(
+                f"Could not read update settings: {self.update_settings_error}"
+            )
+        if (
+            self.update_settings["automatic_updates"]
+            and release_check.automatic_check_due(
+                self.update_settings["last_checked"]
+            )
+        ):
+            self.root.after(700, lambda: self._start_update_check(manual=False))
 
     def _profiles(self):
         return [
@@ -466,6 +499,14 @@ class CirclioReportApp:
             style="Muted.TLabel",
             wraplength=850,
         ).pack(anchor="w", pady=(4, 16))
+        ttk.Label(
+            tab,
+            text="Privacy note: the database, local token, archived pictures, and "
+            "exported workbooks are not encrypted. Encryption is planned but is "
+            "not currently available.",
+            style="Muted.TLabel",
+            wraplength=850,
+        ).pack(anchor="w", pady=(0, 12))
 
         controls = ttk.Frame(tab)
         controls.pack(fill="x", pady=(0, 12))
@@ -492,6 +533,51 @@ class CirclioReportApp:
             controls, text="Refresh reports", command=self.refresh
         ).pack(side="right")
 
+        update_controls = ttk.Frame(tab)
+        update_controls.pack(fill="x", pady=(0, 8))
+        ttk.Checkbutton(
+            update_controls,
+            text="Check for updates automatically",
+            variable=self.auto_updates,
+            command=self._save_update_settings,
+        ).pack(side="left")
+        self.update_check_button = ttk.Button(
+            update_controls,
+            text="Check for updates",
+            command=lambda: self._start_update_check(manual=True),
+        )
+        self.update_check_button.pack(side="right")
+        self.update_status_label = ttk.Label(
+            update_controls, text=f"Version {VERSION}", style="Muted.TLabel"
+        )
+        self.update_status_label.pack(side="right", padx=(0, 12))
+
+        self.update_notice = ttk.Frame(tab, padding=(12, 10))
+        self.update_notice.configure(relief="groove")
+        self.update_notice.pack_forget()
+        self.update_notice_heading = ttk.Label(
+            self.update_notice, text="", style="Section.TLabel"
+        )
+        self.update_notice_heading.pack(anchor="w")
+        self.update_notes_view = scrolledtext.ScrolledText(
+            self.update_notice,
+            height=4,
+            wrap="word",
+            background=SURFACE,
+            foreground=TEXT,
+            relief="flat",
+            font=("Segoe UI", 9),
+            state="disabled",
+        )
+        self.update_notes_view.pack(fill="x", pady=(6, 8))
+        self.update_release_button = ttk.Button(
+            self.update_notice,
+            text="Open release page",
+            command=self._open_release_page,
+        )
+        self.update_release_button.pack(anchor="e")
+        self.latest_release_url = None
+
         ttk.Label(tab, text="Service log", style="Section.TLabel").pack(
             anchor="w", pady=(4, 8)
         )
@@ -510,6 +596,86 @@ class CirclioReportApp:
         self._append_server_log(
             "The local service is stopped. Select Start service before collecting."
         )
+
+    def _save_update_settings(self):
+        self.update_settings["automatic_updates"] = bool(self.auto_updates.get())
+        try:
+            release_check.save_settings(
+                self.update_settings_path, self.update_settings
+            )
+        except OSError as error:
+            self._append_server_log(f"Could not save update settings: {error}")
+
+    def _start_update_check(self, manual):
+        if self.update_check_running:
+            return
+        if not manual and not self.auto_updates.get():
+            return
+        self.update_check_running = True
+        self.update_check_button.configure(state="disabled")
+        threading.Thread(
+            target=self._fetch_update_in_background,
+            args=(manual,),
+            daemon=True,
+            name="ib-circlio-update-check",
+        ).start()
+
+    def _fetch_update_in_background(self, manual):
+        try:
+            release = release_check.fetch_latest_release()
+            error = None
+        except (OSError, URLError, ValueError) as caught:
+            release = None
+            error = str(caught)
+        try:
+            self.root.after(
+                0,
+                lambda: self._finish_update_check(manual, release, error),
+            )
+        except tk.TclError:
+            pass
+
+    def _finish_update_check(self, manual, release, error):
+        self.update_check_running = False
+        self.update_check_button.configure(state="normal")
+        self.update_settings["last_checked"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+        try:
+            release_check.save_settings(
+                self.update_settings_path, self.update_settings
+            )
+        except OSError as settings_error:
+            self._append_server_log(
+                f"Could not save update check time: {settings_error}"
+            )
+
+        if error:
+            self._append_server_log(f"Update check failed: {error}")
+            return
+        if not release:
+            self._append_server_log("GitHub returned no valid stable release.")
+            return
+        if not release_check.update_available(VERSION, release):
+            if manual:
+                self.update_status_label.configure(text="No update available")
+            return
+
+        self.latest_release_url = release["url"]
+        self.update_notice_heading.configure(
+            text=f"Update available: v{release['version']}"
+        )
+        self.update_notes_view.configure(state="normal")
+        self.update_notes_view.delete("1.0", "end")
+        self.update_notes_view.insert(
+            "1.0", release["notes"] or "No release notes were provided."
+        )
+        self.update_notes_view.configure(state="disabled")
+        self.update_notice.pack(fill="x", pady=(0, 10), before=self.server_log_view)
+
+    def _open_release_page(self):
+        if self.latest_release_url:
+            webbrowser.open(self.latest_release_url)
 
     def _append_server_log(self, message):
         if self.server_log_view is None:
@@ -530,7 +696,9 @@ class CirclioReportApp:
         config_path = self.app_directory / "config.js"
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
-            launcher.prepare_local_config(self.data_dir, config_path)
+            launcher.prepare_extension_configs(
+                self.data_dir, self.app_directory
+            )
             packaged_server = self.app_directory / "ib-circlio-server.exe"
             if packaged_server.is_file():
                 command = [
@@ -1472,7 +1640,7 @@ def main():
     parser = argparse.ArgumentParser(description="IB_Circlio desktop application")
     parser.add_argument(
         "--data-dir",
-        default=str(Path.home() / "Desktop" / "Instagram Exporter Data"),
+        default=str(default_data_dir()),
     )
     args = parser.parse_args()
     data_dir = Path(args.data_dir).expanduser()

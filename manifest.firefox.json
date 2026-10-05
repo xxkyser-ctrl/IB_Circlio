@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IB Circlio",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Privacy-first local Instagram follower and following history tracker with SQLite and change detection.",
   "icons": {
     "16": "icons/ib-16.png",
@@ -9,13 +9,14 @@
     "48": "icons/ib-48.png",
     "128": "icons/ib-128.png"
   },
-  "permissions": ["scripting"],
+  "permissions": ["scripting", "alarms", "storage"],
   "host_permissions": [
     "https://www.instagram.com/*",
-    "http://127.0.0.1:8765/*"
+    "http://127.0.0.1:8765/*",
+    "https://api.github.com/*"
   ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["config.js", "background.js"]
   },
   "action": {
     "default_title": "IB Circlio",

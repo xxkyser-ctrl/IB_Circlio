@@ -8,6 +8,13 @@ from datetime import datetime, date
 from pathlib import Path
 
 
+def excel_safe_text(value):
+    text = "" if value is None else str(value)
+    if text.startswith(("=", "+", "-", "@")):
+        text = "'" + text
+    return escape(text)
+
+
 def choose_profile(connection, requested):
     if requested:
         return requested.strip().lower()
@@ -177,7 +184,7 @@ def write_workbook(output, profile, collection, grouped, connection, avatar_diff
 <cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="3" borderId="0" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="4" borderId="0" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/></cellXfs></styleSheet>"""
 
     def cell(value, style=0):
-        value = escape(str(value))
+        value = excel_safe_text(value)
         return f'<c t="inlineStr" s="{style}"><is><t>{value}</t></is></c>'
 
     def sheet(rows, widths):
@@ -250,7 +257,7 @@ def write_table_workbook(output, sheet_name, headers, rows):
         for column, value in enumerate(row, 1):
             reference = f"{column_name(column)}{row_number}"
             style = 1 if row_number == 1 else 0
-            text = escape("" if value is None else str(value))
+            text = excel_safe_text(value)
             cells.append(
                 f'<c r="{reference}" t="inlineStr" s="{style}"><is><t xml:space="preserve">{text}</t></is></c>'
             )

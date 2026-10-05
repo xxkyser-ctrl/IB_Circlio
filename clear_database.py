@@ -9,6 +9,9 @@ import sqlite3
 import shutil
 from pathlib import Path
 
+from data_paths import default_data_dir
+from file_permissions import restrict_to_current_user
+
 
 ITERATIONS = 600_000
 
@@ -29,6 +32,7 @@ def read_or_create_password(path):
         password = getpass.getpass("Enter the database-clear password: ")
         if not hmac.compare_digest(password_digest(password, salt), expected):
             raise ValueError("Incorrect password.")
+        restrict_to_current_user(path)
         return
 
     print("No clear password exists yet.")
@@ -41,6 +45,7 @@ def read_or_create_password(path):
     path.write_text(
         f"{salt.hex()}${ITERATIONS}${digest.hex()}\n", encoding="utf-8"
     )
+    restrict_to_current_user(path)
     print("Clear password created. Only its salted hash was stored.")
 
 
@@ -74,7 +79,7 @@ def clear_database(path):
 
 def main():
     parser = argparse.ArgumentParser(description="Clear Instagram Exporter SQLite data")
-    parser.add_argument("--data-dir", required=True)
+    parser.add_argument("--data-dir", default=str(default_data_dir()))
     args = parser.parse_args()
     data_dir = Path(args.data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned build dependencies
+        run: py -3 -m pip install -r requirements-build.txt
+      - name: Run test suite
+        run: py -3 -B -m unittest -q
+      - name: Audit Python dependencies
+        run: |
+          py -3 -m pip install pip-audit
+          py -3 -m pip_audit -r requirements-build.txt

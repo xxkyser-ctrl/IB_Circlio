@@ -1,3 +1,18 @@
+# IB Circlio v1.0.7
+
+## What's new
+
+- Add optional, once-daily release checks to the desktop app and browser extension, with release notes and a link to the official GitHub release. No files are downloaded or installed automatically.
+- Add Firefox support alongside Chrome, Edge, Brave, Opera, and other Chromium browsers, with separate browser-family extension packages and a service-version warning.
+- Harden the loopback service with exact local-host and extension-origin checks, token-required data routes, strict collection validation, bounded image downloads, and formula-safe workbook text.
+- Store new installations under `%LOCALAPPDATA%\IB Circlio`, while continuing to use the legacy Desktop folder when it exists and the new folder does not.
+- Add the MIT license, third-party notices, release checksums, pinned build dependencies, and GitHub Actions CI/release workflows.
+
+## Important notes
+
+- The database, local token, avatar archive, and exported workbooks remain unencrypted. Database encryption is planned but is not available in this release.
+- Update checks are enabled by default and can be disabled separately in the desktop app and extension. They contact the public GitHub Releases API only and send no personal or collection data.
+
 # IB_Circlio v1.0.6
 
 ## What's new

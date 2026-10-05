@@ -1,25 +1,42 @@
 """Local SQLite backend for the Instagram Exporter extension."""
 
 import argparse
+import hashlib
 import hmac
+import ipaddress
+import io
 import json
 import os
 import re
 import sqlite3
+import socket
 import threading
-import urllib.request
 import urllib.error
+import urllib.request
+from urllib.request import HTTPRedirectHandler
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from PIL import Image
+
+from data_paths import default_data_dir
+from version import VERSION
+
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "Instagram Exporter Data")
+DEFAULT_DATA_DIR = str(default_data_dir())
 DEFAULT_DB_PATH = os.path.join(DEFAULT_DATA_DIR, "instagram.db")
 USERNAME_RE = re.compile(r"^[a-z0-9._]{1,30}$")
 MAX_REQUEST_BYTES = 25 * 1024 * 1024
 EXTENSION_ORIGIN_RE = re.compile(r"^chrome-extension://[a-p]{32}$")
+FIREFOX_ORIGIN_RE = re.compile(
+    r"^moz-extension://[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+AVATAR_HOST_SUFFIXES = (".cdninstagram.com", ".fbcdn.net")
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
+MAX_AVATAR_PIXELS = 20_000_000
 
 
 def normalize_username(value):
@@ -39,8 +56,48 @@ def normalize_profile(value):
 def normalize_users(values):
     if not isinstance(values, list):
         raise ValueError("followers and following must be arrays")
-    result = {user for value in values if (user := normalize_username(value))}
+    result = set()
+    for value in values:
+        user = normalize_username(value)
+        if user is None:
+            raise ValueError("followers and following must contain valid usernames")
+        result.add(user)
     return sorted(result)
+
+
+def validate_avatar_url(url):
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower()
+    if (
+        parsed.scheme != "https"
+        or not hostname
+        or parsed.username
+        or parsed.password
+        or parsed.port not in (None, 443)
+        or not hostname.endswith(AVATAR_HOST_SUFFIXES)
+    ):
+        raise ValueError("Avatar URL is not from a permitted HTTPS CDN.")
+    try:
+        addresses = socket.getaddrinfo(
+            hostname, 443, type=socket.SOCK_STREAM
+        )
+    except OSError as error:
+        raise ValueError("Avatar CDN hostname could not be resolved.") from error
+    if not addresses:
+        raise ValueError("Avatar CDN hostname has no addresses.")
+    for address in addresses:
+        ip = ipaddress.ip_address(address[4][0].split("%", 1)[0])
+        if not ip.is_global:
+            raise ValueError("Avatar CDN resolved to a non-public IP address.")
+    return parsed
+
+
+class SafeAvatarRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        validate_avatar_url(new_url)
+        return super().redirect_request(
+            request, file_pointer, code, message, headers, new_url
+        )
 
 
 SCHEMA = """
@@ -140,28 +197,61 @@ class Database:
 
     @synchronized
     def save_collection(self, payload):
+        if not isinstance(payload, dict):
+            raise ValueError("collection body must be a JSON object")
         profile = normalize_profile(payload.get("profile"))
         if not profile:
             raise ValueError("profile must be an Instagram username")
         followers = normalize_users(payload.get("followers"))
         following = normalize_users(payload.get("following"))
-        avatar_urls = payload.get("avatars") or {}
-        if not isinstance(avatar_urls, dict):
+        avatar_urls = payload.get("avatars", {})
+        if avatar_urls is None:
             avatar_urls = {}
-        refresh_avatars = bool(payload.get("refreshAvatars") or payload.get("refresh_avatars"))
-        header_totals = payload.get("headerTotals") or {}
+        if not isinstance(avatar_urls, dict):
+            raise ValueError("avatars must be an object")
+        for username, url in avatar_urls.items():
+            if (
+                normalize_username(username) != username
+                or not isinstance(url, str)
+                or len(url) > 2048
+            ):
+                raise ValueError("avatars must map valid usernames to URL strings")
+        refresh_avatars = payload.get(
+            "refreshAvatars", payload.get("refresh_avatars", False)
+        )
+        if not isinstance(refresh_avatars, bool):
+            raise ValueError("refreshAvatars must be true or false")
+        header_totals = payload.get("headerTotals", {})
+        if header_totals is None:
+            header_totals = {}
+        if not isinstance(header_totals, dict):
+            raise ValueError("headerTotals must be an object")
         followers_header_total = header_totals.get("followers")
         following_header_total = header_totals.get("following")
-        header_labels = payload.get("headerTotalLabels") or {}
+        for total in (followers_header_total, following_header_total):
+            if total is not None and (
+                isinstance(total, bool)
+                or not isinstance(total, int)
+                or total < 0
+                or total > 2_147_483_647
+            ):
+                raise ValueError("header totals must be non-negative integers")
+        header_labels = payload.get("headerTotalLabels", {})
+        if header_labels is None:
+            header_labels = {}
+        if not isinstance(header_labels, dict):
+            raise ValueError("headerTotalLabels must be an object")
         followers_header_text = header_labels.get("followers")
         following_header_text = header_labels.get("following")
-        if not isinstance(followers_header_text, str):
-            followers_header_text = None
-        if not isinstance(following_header_text, str):
-            following_header_text = None
-        followers_header_text = followers_header_text[:300] if followers_header_text else None
-        following_header_text = following_header_text[:300] if following_header_text else None
-        complete = 1 if payload.get("complete", True) else 0
+        for label in (followers_header_text, following_header_text):
+            if label is not None and (
+                not isinstance(label, str) or len(label) > 300
+            ):
+                raise ValueError("header total labels must be strings of at most 300 characters")
+        complete = payload.get("complete", True)
+        if not isinstance(complete, bool):
+            raise ValueError("complete must be true or false")
+        complete = int(complete)
         captured_at = datetime.now(timezone.utc).isoformat()
         now = datetime.now(timezone.utc).isoformat()
         db = self.connection
@@ -239,7 +329,7 @@ class Database:
             all_usernames = set(followers) | set(following)
             for username in sorted(all_usernames):
                 url = avatar_urls.get(username)
-                if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+                if not isinstance(url, str):
                     continue
                 user_id = db.execute(
                     "SELECT id FROM users WHERE username = ?", (username,)
@@ -262,27 +352,57 @@ class Database:
         return self.get_collection(collection_id)
 
     def _avatar_path(self, username, source_url, refresh=False, collection_id=None):
+        try:
+            validate_avatar_url(source_url)
+        except (OSError, ValueError):
+            return None, None
+        avatar_dir = os.path.join(os.path.dirname(os.path.abspath(self.path)), "avatars")
+        os.makedirs(avatar_dir, exist_ok=True)
         row = self.connection.execute(
             "SELECT image_path, source_url FROM avatar_cache WHERE username = ?", (username,)
         ).fetchone()
-        if row and not refresh and row["source_url"] == source_url and os.path.isfile(row["image_path"]):
-            fetched = self.connection.execute(
-                "SELECT fetched_at FROM avatar_cache WHERE username = ?", (username,)
-            ).fetchone()["fetched_at"]
-            return row["image_path"], fetched
-        avatar_dir = os.path.join(os.path.dirname(os.path.abspath(self.path)), "avatars")
-        os.makedirs(avatar_dir, exist_ok=True)
+        if row and not refresh and row["source_url"] == source_url:
+            cache_path = os.path.realpath(row["image_path"])
+            try:
+                cache_path_is_local = (
+                    os.path.commonpath((os.path.realpath(avatar_dir), cache_path))
+                    == os.path.realpath(avatar_dir)
+                )
+            except ValueError:
+                cache_path_is_local = False
+            if cache_path_is_local and os.path.isfile(cache_path):
+                fetched = self.connection.execute(
+                    "SELECT fetched_at FROM avatar_cache WHERE username = ?", (username,)
+                ).fetchone()["fetched_at"]
+                return row["image_path"], fetched
         version = collection_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        destination = os.path.join(avatar_dir, f"{username}_{version}.jpg")
         try:
             request = urllib.request.Request(source_url, headers={"User-Agent": "IB-Circlio/1.0"})
-            with urllib.request.urlopen(request, timeout=10) as response:
+            opener = urllib.request.build_opener(SafeAvatarRedirectHandler())
+            with opener.open(request, timeout=10) as response:
+                validate_avatar_url(response.geturl())
                 content_type = response.headers.get_content_type()
                 if content_type not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
                     return None, None
-                data = response.read(5 * 1024 * 1024 + 1)
-                if not data or len(data) > 5 * 1024 * 1024:
-                    return None
+                data = response.read(MAX_AVATAR_BYTES + 1)
+                if not data or len(data) > MAX_AVATAR_BYTES:
+                    return None, None
+            with Image.open(io.BytesIO(data)) as image:
+                if image.width * image.height > MAX_AVATAR_PIXELS:
+                    raise ValueError("Avatar image dimensions are too large.")
+                image.verify()
+                suffix = {
+                    "JPEG": ".jpg",
+                    "PNG": ".png",
+                    "WEBP": ".webp",
+                    "GIF": ".gif",
+                }.get(image.format)
+            if not suffix:
+                return None, None
+            digest = hashlib.sha256(
+                f"{username}:{source_url}:{version}".encode("utf-8")
+            ).hexdigest()[:32]
+            destination = os.path.join(avatar_dir, f"{digest}{suffix}")
             with open(destination, "wb") as image_file:
                 image_file.write(data)
             now = datetime.now(timezone.utc).isoformat()
@@ -294,7 +414,13 @@ class Database:
                 (username, destination, source_url, now),
             )
             return destination, now
-        except (OSError, ValueError, urllib.error.URLError, urllib.error.HTTPError):
+        except (
+            OSError,
+            ValueError,
+            Image.DecompressionBombError,
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+        ):
             return None, None
 
     @synchronized
@@ -390,9 +516,18 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_args):
         pass
 
+    def host_allowed(self):
+        port = self.server.server_port
+        host = self.headers.get("Host", "")
+        return host in (f"127.0.0.1:{port}", f"localhost:{port}")
+
     def origin_allowed(self):
         origin = self.headers.get("Origin")
-        return not origin or EXTENSION_ORIGIN_RE.fullmatch(origin)
+        return (
+            not origin
+            or bool(EXTENSION_ORIGIN_RE.fullmatch(origin))
+            or bool(FIREFOX_ORIGIN_RE.fullmatch(origin))
+        )
 
     def authorized(self):
         value = self.headers.get("Authorization", "")
@@ -400,6 +535,9 @@ class Handler(BaseHTTPRequestHandler):
         return bool(self.token) and hmac.compare_digest(value, expected)
 
     def require_access(self):
+        if not self.host_allowed():
+            self.send_json(403, {"ok": False, "error": "Host not allowed"})
+            return False
         if not self.origin_allowed():
             self.send_json(403, {"ok": False, "error": "Origin not allowed"})
             return False
@@ -414,7 +552,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         origin = self.headers.get("Origin")
-        if origin and EXTENSION_ORIGIN_RE.fullmatch(origin):
+        if origin and (
+            EXTENSION_ORIGIN_RE.fullmatch(origin)
+            or FIREFOX_ORIGIN_RE.fullmatch(origin)
+        ):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -423,6 +564,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_OPTIONS(self):
+        if not self.host_allowed():
+            return self.send_json(403, {"ok": False, "error": "Host not allowed"})
         if not self.origin_allowed():
             return self.send_json(403, {"ok": False, "error": "Origin not allowed"})
         self.send_json(204, {})
@@ -431,8 +574,18 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         try:
+            if not self.host_allowed():
+                return self.send_json(403, {"ok": False, "error": "Host not allowed"})
+            if not self.origin_allowed():
+                return self.send_json(403, {"ok": False, "error": "Origin not allowed"})
             if parsed.path == "/api/health":
                 return self.send_json(200, {"ok": True, "service": "instagram-exporter"})
+            if parsed.path == "/version":
+                if not self.require_access():
+                    return
+                return self.send_json(
+                    200, {"ok": True, "version": VERSION}
+                )
             if not self.require_access():
                 return
             if parsed.path in ("/api/collections/latest", "/api/collections/history"):
@@ -455,15 +608,22 @@ class Handler(BaseHTTPRequestHandler):
         if request_path != "/api/collections":
             return self.send_json(404, {"ok": False, "error": "Not found"})
         try:
-            length = int(self.headers.get("Content-Length", "0"))
+            if self.headers.get("Transfer-Encoding"):
+                raise ValueError("transfer-encoded request bodies are not supported")
+            if self.headers.get_content_type() != "application/json":
+                raise ValueError("Content-Type must be application/json")
+            length = int(self.headers.get("Content-Length", ""))
             if length < 0 or length > MAX_REQUEST_BYTES:
                 raise ValueError("request body is too large")
-            payload = json.loads(self.rfile.read(length))
+            body = self.rfile.read(length)
+            if len(body) != length:
+                raise ValueError("request body length does not match Content-Length")
+            payload = json.loads(body.decode("utf-8"))
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
             collection = self.db.save_collection(payload)
             self.send_json(201, {"ok": True, "collection": collection})
-        except (ValueError, TypeError, json.JSONDecodeError) as error:
+        except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError) as error:
             self.send_json(400, {"ok": False, "error": str(error)})
         except Exception as error:
             print(f"POST {request_path} failed: {error}", flush=True)

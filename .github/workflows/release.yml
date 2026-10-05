@@ -1,0 +1,48 @@
+name: Build and publish release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned build dependencies
+        run: py -3 -m pip install -r requirements-build.txt
+      - name: Run test suite
+        run: py -3 -B -m unittest -q
+      - name: Build Windows and browser packages
+        run: py -3 -B build_release.py
+      - name: Verify generated checksums
+        shell: pwsh
+        run: |
+          $checksums = Get-Content release\SHA256SUMS.txt
+          foreach ($line in $checksums) {
+            $parts = $line -split '\s+', 2
+            $actual = (Get-FileHash ("release\" + $parts[1]) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $parts[0]) {
+              throw "Checksum mismatch for $($parts[1])"
+            }
+          }
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $assets = @(
+            Get-ChildItem release -File |
+              Where-Object { $_.Name -match '^IB-Circlio-.*-(windows|chromium-extension|firefox-extension)\.zip$' } |
+              ForEach-Object { $_.FullName }
+          )
+          $assets += (Resolve-Path release\SHA256SUMS.txt).Path
+          gh release create $env:GITHUB_REF_NAME $assets `
+            --title "IB Circlio $env:GITHUB_REF_NAME" `
+            --notes-file RELEASE_NOTES.md

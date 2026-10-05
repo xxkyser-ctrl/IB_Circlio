@@ -1,46 +1,63 @@
+const ext = globalThis.browser ?? globalThis.chrome;
 const statusElement = document.getElementById("status");
 const startButton = document.getElementById("start");
+const updateBanner = document.getElementById("update-banner");
+const updatesCheckbox = document.getElementById("check-updates");
+let availableReleaseVersion = "";
+let availableReleaseUrl = "";
+
+function extensionCall(target, method, ...args) {
+  if (globalThis.browser) return Promise.resolve(target[method](...args));
+  return new Promise((resolve, reject) => {
+    target[method](...args, (result) => {
+      const error = ext.runtime.lastError;
+      if (error) reject(new Error(error.message));
+      else resolve(result);
+    });
+  });
+}
+
+function sendRuntimeMessage(message) {
+  return extensionCall(ext.runtime, "sendMessage", message);
+}
 
 function setStatus(message) {
   statusElement.textContent = message;
 }
 
-function getActiveInstagramTab() {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      if (!tab || !tab.url || !tab.url.startsWith("https://www.instagram.com/")) {
-        reject(new Error("Open an Instagram profile first."));
-        return;
-      }
-      resolve(tab);
-    });
+async function getActiveInstagramTab() {
+  const tabs = await extensionCall(ext.tabs, "query", {
+    active: true,
+    currentWindow: true
   });
+  const tab = tabs[0];
+  if (!tab || !tab.url || !tab.url.startsWith("https://www.instagram.com/")) {
+    throw new Error("Open an Instagram profile first.");
+  }
+  return tab;
 }
 
-function sendToTab(tabId, message) {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
-      if (chrome.runtime.lastError) {
-        const messageText = chrome.runtime.lastError.message || "";
-        if (!messageText.includes("Receiving end does not exist")) {
-          reject(new Error(messageText));
-          return;
-        }
-        chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }, () => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(`Could not connect to Instagram: ${chrome.runtime.lastError.message}`));
-            return;
-          }
-          chrome.tabs.sendMessage(tabId, message, (retryResponse) => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve(retryResponse);
-          });
-        });
-      }
-      else resolve(response);
-    });
-  });
+async function sendToTab(tabId, message) {
+  try {
+    return await extensionCall(ext.tabs, "sendMessage", tabId, message);
+  } catch (error) {
+    if (!/Receiving end does not exist|Could not establish connection/i.test(error.message)) {
+      throw error;
+    }
+    if (ext.scripting?.executeScript) {
+      await extensionCall(ext.scripting, "executeScript", {
+        target: { tabId },
+        files: ["content.js"]
+      });
+    } else if (ext.tabs.executeScript) {
+      await extensionCall(ext.tabs, "executeScript", tabId, {
+        file: "content.js"
+      });
+    } else {
+      throw new Error("This browser cannot inject the collection script.");
+    }
+    return extensionCall(ext.tabs, "sendMessage", tabId, message);
+  }
 }
 
 function setBusy(isBusy) {
@@ -58,6 +75,33 @@ async function refreshCollectionState() {
   } catch (error) {
     setBusy(false);
     setStatus(`Status unavailable: ${error.message}`);
+  }
+}
+
+async function refreshUpdateState() {
+  try {
+    const response = await sendRuntimeMessage({ action: "getUpdateState" });
+    if (!response?.ok) return;
+    updatesCheckbox.checked = response.updates.checkForUpdates !== false;
+    document.getElementById("version-mismatch").hidden =
+      !response.versionMismatch;
+    const release = response.updates;
+    if (release.checkForUpdates !== false &&
+        release.latestVersion &&
+        release.latestVersion !== release.dismissedVersion &&
+        release.releaseUrl) {
+      availableReleaseVersion = release.latestVersion;
+      availableReleaseUrl = release.releaseUrl;
+      document.getElementById("update-heading").textContent =
+        `Update available: v${release.latestVersion}`;
+      document.getElementById("release-notes").textContent =
+        release.releaseNotes || "No release notes were provided.";
+      updateBanner.hidden = false;
+    } else {
+      updateBanner.hidden = true;
+    }
+  } catch {
+    // Update metadata is optional; collection remains available if the service is stopped.
   }
 }
 
@@ -100,9 +144,41 @@ document.getElementById("stop").addEventListener("click", async () => {
   }
 });
 document.getElementById("feedback").addEventListener("click", () => {
-  chrome.tabs.create({ url: "https://github.com/xxkyser-ctrl/IB_Circlio/issues/new" });
+  extensionCall(ext.tabs, "create", {
+    url: "https://github.com/xxkyser-ctrl/IB_Circlio/issues/new"
+  }).catch((error) => setStatus(error.message));
 });
-chrome.runtime.onMessage.addListener((message) => {
+document.getElementById("open-release").addEventListener("click", () => {
+  if (availableReleaseUrl) {
+    extensionCall(ext.tabs, "create", { url: availableReleaseUrl })
+      .catch((error) => setStatus(error.message));
+  }
+});
+document.getElementById("dismiss-update").addEventListener("click", async () => {
+  try {
+    await sendRuntimeMessage({
+      action: "dismissUpdate",
+      version: availableReleaseVersion
+    });
+    updateBanner.hidden = true;
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+updatesCheckbox.addEventListener("change", async () => {
+  try {
+    const response = await sendRuntimeMessage({
+      action: "setUpdateChecks",
+      enabled: updatesCheckbox.checked
+    });
+    if (!response?.ok) throw new Error(response?.error || "Could not save update preference.");
+    await refreshUpdateState();
+  } catch (error) {
+    setStatus(error.message);
+    updatesCheckbox.checked = !updatesCheckbox.checked;
+  }
+});
+ext.runtime.onMessage.addListener((message) => {
   if (message.action === "scanProgress" || message.action === "collectionProgress") {
     setStatus(message.message || `Scanning ${message.listType}: ${message.count} collected`);
   }
@@ -114,4 +190,5 @@ chrome.runtime.onMessage.addListener((message) => {
 
 setBusy(true);
 refreshCollectionState();
+refreshUpdateState();
 window.setInterval(refreshCollectionState, 700);

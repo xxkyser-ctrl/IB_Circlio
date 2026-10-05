@@ -361,6 +361,23 @@ class SnapshotReportTests(unittest.TestCase):
         self.assertEqual(lookup._avatar_path(middle, "alice"), "avatars/alice-old.jpg")
         self.assertEqual(lookup._avatar_path(last, "alice"), "avatars/alice-new.jpg")
 
+    def test_table_export_neutralizes_formula_like_text(self):
+        workbook = Path(self.directory.name) / "safe.xlsx"
+        result.write_table_workbook(
+            workbook,
+            "Formula test",
+            ["Username"],
+            [["=1+1"], ["+command"], ["-command"], ["@command"]],
+        )
+        with zipfile.ZipFile(workbook) as archive:
+            sheet = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
+        ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        values = [node.text for node in sheet.findall(".//x:is/x:t", ns)]
+        self.assertEqual(
+            values,
+            ["Username", "'=1+1", "'+command", "'-command", "'@command"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
