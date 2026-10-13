@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS collections (
     captured_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     complete INTEGER NOT NULL DEFAULT 1,
+    error_message TEXT,
     followers_header_text TEXT,
     following_header_text TEXT
 );
@@ -184,6 +185,12 @@ class Database:
         try:
             self.connection.execute(
                 "ALTER TABLE collections ADD COLUMN complete INTEGER NOT NULL DEFAULT 1"
+            )
+        except database_access.SQLITE_OPERATIONAL_ERRORS:
+            pass
+        try:
+            self.connection.execute(
+                "ALTER TABLE collections ADD COLUMN error_message TEXT"
             )
         except database_access.SQLITE_OPERATIONAL_ERRORS:
             pass
@@ -253,6 +260,13 @@ class Database:
         if not isinstance(complete, bool):
             raise ValueError("complete must be true or false")
         complete = int(complete)
+        error_message = payload.get("error")
+        if error_message is not None and (
+            not isinstance(error_message, str) or len(error_message) > 1000
+        ):
+            raise ValueError("error must be a string of at most 1000 characters or null")
+        if complete and error_message:
+            raise ValueError("complete collections cannot contain an error")
         captured_at = datetime.now(timezone.utc).isoformat()
         now = datetime.now(timezone.utc).isoformat()
         db = self.connection
@@ -285,12 +299,13 @@ class Database:
             db.execute(
                 """INSERT INTO collections
                    (profile_id, captured_at, created_at, followers_header_total,
-                    following_header_total, complete, followers_header_text,
-                    following_header_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    following_header_total, complete, error_message,
+                    followers_header_text, following_header_text)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     profile_id, captured_at, now, followers_header_total,
-                    following_header_total, complete, followers_header_text,
-                    following_header_text,
+                    following_header_total, complete, error_message,
+                    followers_header_text, following_header_text,
                 ),
             )
             collection_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -433,6 +448,7 @@ class Database:
     def get_collection(self, collection_id):
         row = self.connection.execute(
             """SELECT c.id, p.username AS profile, c.captured_at, c.complete,
+                      c.error_message,
                       c.followers_header_total, c.following_header_total,
                       c.followers_header_text, c.following_header_text
                FROM collections c JOIN profiles p ON p.id = c.profile_id
@@ -443,6 +459,7 @@ class Database:
         result = {"id": row["id"], "profile": row["profile"],
                   "capturedAt": row["captured_at"],
                   "complete": bool(row["complete"]),
+                  "error": row["error_message"],
                   "headerTotals": {
                       "followers": row["followers_header_total"],
                       "following": row["following_header_total"]

@@ -232,6 +232,49 @@ class AvatarCollectionTests(unittest.TestCase):
             database.close()
 
 
+class PartialCollectionTests(unittest.TestCase):
+    def test_partial_snapshot_and_reason_are_saved_and_returned_in_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = server.Database(str(Path(directory) / "instagram.db"))
+            reason = (
+                "Only 122 following were collected, but the profile shows at least 200."
+            )
+            collection = database.save_collection({
+                "profile": "owner",
+                "followers": ["alice"],
+                "following": ["first", "second"],
+                "complete": False,
+                "error": reason,
+                "headerTotals": {"followers": 1, "following": 200},
+                "headerTotalLabels": {
+                    "followers": "1 follower",
+                    "following": "200+ following",
+                },
+            })
+
+            self.assertFalse(collection["complete"])
+            self.assertEqual(collection["error"], reason)
+            history = database.history("owner")
+            self.assertEqual(len(history), 1)
+            self.assertFalse(history[0]["complete"])
+            self.assertEqual(history[0]["error"], reason)
+            self.assertEqual(history[0]["following"], ["first", "second"])
+            database.close()
+
+    def test_complete_snapshot_cannot_store_a_partial_error_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = server.Database(str(Path(directory) / "instagram.db"))
+            with self.assertRaisesRegex(ValueError, "complete collections"):
+                database.save_collection({
+                    "profile": "owner",
+                    "followers": [],
+                    "following": [],
+                    "complete": True,
+                    "error": "fixture failure",
+                })
+            database.close()
+
+
 class AvatarUrlValidationTests(unittest.TestCase):
     def test_only_public_https_instagram_cdn_urls_are_accepted(self):
         with self.assertRaises(ValueError):

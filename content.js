@@ -9,6 +9,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
   const excludedPaths = new Set([
     "accounts", "direct", "explore", "reel", "reels", "stories", "p", "tv", "create"
   ]);
+  const STABLE_BOTTOM_ATTEMPTS = 8;
   const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
   function sendRuntimeMessage(message) {
@@ -109,16 +110,16 @@ const ext = globalThis.browser ?? globalThis.chrome;
         listType, count: users.size, attempts
       });
 
-      if (added === 0) stableAttempts += 1;
-      else stableAttempts = 0;
       const moved = refreshedContainer.scrollTop > previousTop + 2;
       const atBottom = refreshedContainer.scrollTop + refreshedContainer.clientHeight >= refreshedContainer.scrollHeight - 10;
+      if (added === 0 && !moved) stableAttempts += 1;
+      else stableAttempts = 0;
       if (!moved && added === 0) {
         const visibleLinks = [...refreshedDialog.querySelectorAll("a[href]")].filter((link) => link.offsetParent !== null);
         visibleLinks[visibleLinks.length - 1]?.scrollIntoView({ block: "end" });
         await sleep(500);
       }
-      if (stableAttempts >= 4 && atBottom) break;
+      if (stableAttempts >= STABLE_BOTTOM_ATTEMPTS && atBottom) break;
     }
     if (attempts >= 400 && !state.stopRequested) {
       throw new Error(`${listType} scan reached the safety limit; this snapshot will be saved as partial.`);
@@ -200,7 +201,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
       link.textContent
     ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const match = text.match(/(\d[\d.,\s]*[kmb]?)\s*([a-z()]+)/i);
+    const match = text.match(/(\d[\d.,\s]*[kmb]?\+?)\s*([a-z()]+)/i);
     if (!match) return null;
     const label = match[2];
     const isExpectedLabel = listType === "followers"
@@ -209,7 +210,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
         label.includes("abonn") || label.includes("seguid");
     if (!isExpectedLabel) return null;
 
-    const raw = match[1].replace(/\s/g, "");
+    const raw = match[1].replace(/[+\s]/g, "");
     const suffix = raw.slice(-1).toLowerCase();
     const multiplier = suffix === "k" ? 1000 : suffix === "m" ? 1000000 :
       suffix === "b" ? 1000000000 : 1;
@@ -287,6 +288,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
       followers: [],
       following: [],
       avatars: {},
+      complete: true,
       headerTotals: {
         followers: headerTotal("followers"),
         following: headerTotal("following")
@@ -302,6 +304,15 @@ const ext = globalThis.browser ?? globalThis.chrome;
         sendCollectionState(true, `Opening ${listType}...`);
         await openList(listType);
         result[listType] = await scanDialog(listType, result.avatars);
+        const headerTotalCount = result.headerTotals[listType];
+        if (
+          headerTotalCount !== null &&
+          result[listType].length < headerTotalCount
+        ) {
+          throw new Error(
+            `Only ${result[listType].length} ${listType} were collected, but the profile shows at least ${headerTotalCount}. The snapshot is partial; try again after the list finishes loading.`
+          );
+        }
         await closeDialog();
         await sleep(500);
       }
@@ -329,7 +340,10 @@ const ext = globalThis.browser ?? globalThis.chrome;
           avatars: result.avatars,
           headerTotals: result.headerTotals,
           headerTotalLabels: result.headerTotalLabels,
-          complete: result.complete
+          complete: result.complete,
+          error: result.error || (
+            result.complete ? null : "Collection stopped before both lists finished."
+          )
         }
       });
       if (!saveResponse?.ok) {

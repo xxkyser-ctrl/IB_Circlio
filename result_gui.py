@@ -1389,15 +1389,59 @@ class CirclioReportApp:
         self._clear_tree(self.recent_tree)
         self.latest_collection = result.latest_collection(self.connection, self.profile.get())
         collection = self.latest_collection
+        latest_partial = result.latest_partial_collection(
+            self.connection, self.profile.get()
+        )
         if not collection:
+            if latest_partial:
+                followers_count = result.count_members(
+                    self.connection, latest_partial[0], "followers"
+                )
+                following_count = result.count_members(
+                    self.connection, latest_partial[0], "following"
+                )
+                reason = latest_partial[5] or (
+                    "The collection stopped before both lists finished."
+                )
+                self.latest_label.configure(
+                    text=f"Latest saved snapshot · {format_timestamp(latest_partial[1])}"
+                )
+                self.status_label.configure(text="Partial — not used for comparisons")
+                self.card_values["followers"].configure(text=f"{followers_count:,}")
+                self.card_values["following"].configure(text=f"{following_count:,}")
+                for key in (
+                    "new_followers", "removed_followers",
+                    "new_following", "removed_following",
+                ):
+                    self.card_values[key].configure(text="—")
+                self.count_health_label.configure(
+                    text=(
+                        f"Partial snapshot saved: {reason} "
+                        "It is not used as a comparison baseline; collect again "
+                        "to create a complete snapshot."
+                    ),
+                    foreground=RED,
+                )
+                self.recent_tree.insert("", "end", values=(
+                    format_timestamp(latest_partial[1]), "Partial",
+                    f"{followers_count:,}", f"{following_count:,}",
+                ))
+                self._refresh_tree_search(self.recent_tree)
+                return
             self.latest_label.configure(text="No complete snapshots yet")
             self.status_label.configure(text="Collect a snapshot with the extension first.")
             for value in self.card_values.values():
                 value.configure(text="—")
+            self.count_health_label.configure(text="", foreground=SUBTLE)
             self._refresh_tree_search(self.recent_tree)
             return
         self.latest_label.configure(text=f"Latest snapshot  ·  {format_timestamp(collection[1])}")
-        self.status_label.configure(text="Complete")
+        partial_is_newer = bool(
+            latest_partial and latest_partial[1] > collection[1]
+        )
+        self.status_label.configure(
+            text="Newer partial collection saved" if partial_is_newer else "Complete"
+        )
         self.card_values["followers"].configure(
             text=f"{result.count_members(self.connection, collection[0], 'followers'):,}"
         )
@@ -1410,9 +1454,21 @@ class CirclioReportApp:
         self.card_values["removed_followers"].configure(text=f"{len(changes['followers']['removed']):,}")
         self.card_values["new_following"].configure(text=f"{len(changes['following']['added']):,}")
         self.card_values["removed_following"].configure(text=f"{len(changes['following']['removed']):,}")
+        count_health_text = self._count_health_text(collection)
+        if partial_is_newer:
+            partial_reason = latest_partial[5] or (
+                "The collection stopped before both lists finished."
+            )
+            count_health_text = (
+                f"Latest attempt was saved as partial and is excluded from reports: "
+                f"{partial_reason} " + count_health_text
+            ).strip()
         self.count_health_label.configure(
-            text=self._count_health_text(collection),
-            foreground=RED if self._counts_mismatch(collection) else SUBTLE
+            text=count_health_text,
+            foreground=(
+                RED if partial_is_newer or self._counts_mismatch(collection)
+                else SUBTLE
+            )
         )
         for snapshot in reversed(self.snapshots[-8:]):
             item = result.collection_for_date(
@@ -1422,6 +1478,12 @@ class CirclioReportApp:
                 format_timestamp(item[1]), "Complete",
                 f"{result.count_members(self.connection, item[0], 'followers'):,}",
                 f"{result.count_members(self.connection, item[0], 'following'):,}",
+            ))
+        if partial_is_newer:
+            self.recent_tree.insert("", "end", values=(
+                format_timestamp(latest_partial[1]), "Partial",
+                f"{result.count_members(self.connection, latest_partial[0], 'followers'):,}",
+                f"{result.count_members(self.connection, latest_partial[0], 'following'):,}",
             ))
         self._refresh_tree_search(self.recent_tree)
 

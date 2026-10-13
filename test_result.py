@@ -111,6 +111,39 @@ class SnapshotReportTests(unittest.TestCase):
         finally:
             reader.close()
 
+    def test_partial_snapshot_is_visible_but_not_a_comparison_baseline(self):
+        complete_id = self.save(
+            "2026-10-01T10:00:00+00:00", ["alice"], ["following_fixture"]
+        )
+        reason = "Only 122 following were collected; profile shows at least 200."
+        partial = self.database.save_collection({
+            "profile": "owner",
+            "followers": ["alice"],
+            "following": ["following_fixture", "partial_fixture"],
+            "complete": False,
+            "error": reason,
+        })
+
+        latest_partial = result.latest_partial_collection(
+            self.database.connection, "owner"
+        )
+        self.assertEqual(latest_partial[0], partial["id"])
+        self.assertEqual(latest_partial[5], reason)
+        self.assertEqual(
+            result.latest_collection(self.database.connection, "owner")[0],
+            complete_id,
+        )
+
+        next_complete_id = self.save(
+            "2026-10-03T10:00:00+00:00",
+            ["alice", "new_follower"],
+            ["following_fixture"],
+        )
+        previous = result.previous_collection(
+            self.database.connection, "owner", next_complete_id
+        )
+        self.assertEqual(previous[0], complete_id)
+
     def test_gui_count_audit_reports_header_delta(self):
         collection = self.database.save_collection({
             "profile": "owner",

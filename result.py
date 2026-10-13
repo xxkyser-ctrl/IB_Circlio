@@ -313,6 +313,17 @@ def latest_collection(connection, profile):
     ).fetchone()
 
 
+def latest_partial_collection(connection, profile):
+    return connection.execute(
+        """SELECT c.id, c.captured_at, c.complete, c.followers_header_total,
+                  c.following_header_total, c.error_message
+           FROM collections c JOIN profiles p ON p.id = c.profile_id
+           WHERE p.username = ? AND c.complete = 0
+           ORDER BY c.captured_at DESC, c.id DESC LIMIT 1""",
+        (profile,),
+    ).fetchone()
+
+
 def previous_collection(connection, profile, collection_id):
     return connection.execute(
         """SELECT c.id, c.captured_at, c.complete, c.followers_header_total,

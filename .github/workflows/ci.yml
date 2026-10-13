@@ -25,7 +25,7 @@ jobs:
       - name: Run test suite
         run: py -3 -B -m unittest -q
       - name: Test browser update notifications
-        run: node --test test_extension_updates.js
+        run: node --test test_extension_updates.js test_content_collection.js
       - name: Audit Python dependencies
         run: |
           py -3 -m pip install pip-audit
