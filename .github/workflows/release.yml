@@ -24,7 +24,7 @@ jobs:
         run: py -3 -m pip install -r requirements-build.txt
       - name: Run test suite
         run: py -3 -B -m unittest -q
-      - name: Build Windows and browser packages
+      - name: Build the all-in-one Windows package
         run: py -3 -B build_release.py
       - name: Verify generated checksums
         shell: pwsh
@@ -55,8 +55,6 @@ jobs:
           $version = $env:GITHUB_REF_NAME.Substring(1)
           $expectedAssets = @(
             "IB-Circlio-$version-windows.zip",
-            "IB-Circlio-$version-chromium-extension.zip",
-            "IB-Circlio-$version-firefox-extension.zip",
             "SHA256SUMS.txt"
           )
           foreach ($asset in $expectedAssets) {

@@ -9,7 +9,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
   const excludedPaths = new Set([
     "accounts", "direct", "explore", "reel", "reels", "stories", "p", "tv", "create"
   ]);
-  const STABLE_BOTTOM_ATTEMPTS = 8;
+  const STABLE_BOTTOM_ATTEMPTS = 12;
   const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
   function sendRuntimeMessage(message) {

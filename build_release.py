@@ -90,11 +90,11 @@ def build_extension_directory(manifest_name, family, output_root=RELEASE_DIR):
         ROOT / "THIRD_PARTY_NOTICES.md", extension_dir / "THIRD_PARTY_NOTICES.md"
     )
     (extension_dir / "README.txt").write_text(
-        "Extract this directory as extensions\\" + family + " inside the IB Circlio "
-        "Windows package. Start ib_circlio.exe before loading the extension so the "
-        "desktop app can generate the local, private config.js file. Load this "
-        "directory as an unpacked browser extension. The package does not contain "
-        "your token or collection data.\n",
+        "This extension is already included in the all-in-one Windows package as "
+        "extensions\\" + family + ". Start ib_circlio.exe from the package root "
+        "first so it can generate the local, private config.js file here. Load "
+        "this directory as an unpacked browser extension. The package does not "
+        "contain your token or collection data.\n",
         encoding="utf-8",
     )
     return extension_dir
@@ -126,7 +126,7 @@ def zip_windows_release(
                     raise ValueError(
                         f"Refusing to package local data or secret file: {path}"
                     )
-                archive.write(path, path.relative_to(release_dir.parent))
+                archive.write(path, path.relative_to(release_dir))
     return output
 
 
@@ -161,6 +161,7 @@ def main():
     for filename in (
         "result_gui.py",
         "clear_database.bat",
+        "INSTALL.txt",
         "README.md",
         "RELEASE_NOTES.md",
         "SECURITY.md",
@@ -201,11 +202,7 @@ def main():
         )
     chromium_dir = build_extension_directory("manifest.json", "chromium")
     firefox_dir = build_extension_directory("manifest.firefox.json", "firefox")
-    packages = [
-        zip_windows_release(),
-        zip_extension_directory(chromium_dir, "chromium"),
-        zip_extension_directory(firefox_dir, "firefox"),
-    ]
+    packages = [zip_windows_release()]
     write_release_checksums(packages)
     print(f"Portable release created at: {RELEASE_DIR}")
     print(f"Release ZIPs and checksums created in: {RELEASE_ROOT}")

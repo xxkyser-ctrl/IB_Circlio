@@ -58,6 +58,33 @@ class BrowserPackageBuildTests(unittest.TestCase):
                         version="1.0.0",
                     )
 
+    def test_all_in_one_windows_zip_has_files_at_root_and_both_extensions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            package = root / "application"
+            (package / "extensions" / "chromium").mkdir(parents=True)
+            (package / "extensions" / "firefox").mkdir(parents=True)
+            (package / "ib_circlio.exe").write_bytes(b"app")
+            (package / "INSTALL.txt").write_text("quick start", encoding="utf-8")
+            (package / "extensions" / "chromium" / "manifest.json").write_text(
+                "{}", encoding="utf-8"
+            )
+            (package / "extensions" / "firefox" / "manifest.json").write_text(
+                "{}", encoding="utf-8"
+            )
+
+            archive_path = build_release.zip_windows_release(
+                release_dir=package, release_root=root, version="1.0.0"
+            )
+
+            with zipfile.ZipFile(archive_path) as archive:
+                names = set(archive.namelist())
+            self.assertIn("ib_circlio.exe", names)
+            self.assertIn("INSTALL.txt", names)
+            self.assertIn("extensions/chromium/manifest.json", names)
+            self.assertIn("extensions/firefox/manifest.json", names)
+            self.assertFalse(any(name.startswith("application/") for name in names))
+
 
 if __name__ == "__main__":
     unittest.main()

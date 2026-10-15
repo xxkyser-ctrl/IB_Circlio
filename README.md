@@ -46,18 +46,17 @@ The service listens on `127.0.0.1` and stores data on the same PC. The desktop a
 
 ## Installation
 
-IB Circlio is intended for Windows. The latest published portable package is available from [GitHub Releases](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest). The portable app does not require a separate Python installation. Supported browsers are Chrome, Edge, Brave, Opera, other Chromium-based browsers, and Firefox.
+IB Circlio is intended for Windows. Download the single [all-in-one Windows ZIP](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest/download/IB-Circlio-1.0.9-windows.zip). It contains the portable app, quick-start instructions, and extensions for Chromium browsers and Firefox. You do not need to choose or download a separate extension package, and the app does not require Python.
 
-1. Download and extract the latest Windows ZIP.
-2. Start `ib_circlio.exe`.
-3. In the **Collection service** tab, select **Start service**.
-4. In your browser, enable developer/developer mode and load the matching unpacked extension from `extensions\chromium` or `extensions\firefox`.
-5. Open an Instagram profile, select the IB Circlio extension, and start a collection.
-6. Return to the desktop app to browse, compare, and export your snapshots.
+1. Download the ZIP and choose **Extract All** in File Explorer. The extracted folder contains `ib_circlio.exe` and `INSTALL.txt` at its top level.
+2. Start `ib_circlio.exe`. In the **Collection service** tab, select **Start service** and wait for **Running**.
+3. In the browser you already use, load the matching extension folder from the same extracted package. Chrome, Edge, Brave, Opera, and other Chromium browsers use `extensions\chromium`; Firefox uses `extensions\firefox`.
+4. Refresh any Instagram tab that was already open, open a profile while signed in, and start a collection from the IB Circlio extension.
+5. Return to the desktop app to browse, compare, and export snapshots. Keep the app open while collecting; close it when finished.
 
-For Firefox, open `about:debugging`, choose **This Firefox**, select **Load Temporary Add-on...**, and choose `manifest.json` inside `extensions\firefox`. For Chrome, Edge, Brave, Opera, and other Chromium browsers, open the browser's extensions page, enable developer mode, and select **Load unpacked** for `extensions\chromium`.
+For Firefox, open `about:debugging`, choose **This Firefox**, select **Load Temporary Add-on...**, and choose `manifest.json` inside `extensions\firefox`. Firefox temporary add-ons must be loaded again after Firefox closes. For Chrome, Edge, Brave, Opera, and other Chromium browsers, open the browser's extensions page, enable developer mode, and select **Load unpacked** for `extensions\chromium`.
 
-The standalone browser-extension ZIPs are also published with releases. Extract one into the corresponding `extensions\<family>` directory inside the Windows app folder, then start the desktop app so it can generate the local extension configuration. Keep the extracted app and extension folders in place while installed. Reload an Instagram tab that was already open after installing or updating the extension. Stop the service when finished, or close the desktop app to stop the service it started.
+The ZIP includes both browser variants, so the release has one download for the complete setup. Keep the extracted app and extension folders in place while installed. The desktop app creates the private extension configuration when the collection service starts.
 
 The source checkout includes `manifest.firefox.json` for temporary Firefox add-on loading; release builds package it as `extensions\firefox\manifest.json`.
 
@@ -158,10 +157,10 @@ IB Circlio is an independent project and is not affiliated with, endorsed by, or
 
 Released under the MIT License. See [LICENSE](LICENSE). Third-party software is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Windows and browser-extension ZIPs are accompanied by `SHA256SUMS.txt`. After downloading, compare the file's SHA-256 digest with its line in the checksum file. For example:
+The all-in-one Windows ZIP is accompanied by `SHA256SUMS.txt`. After downloading, compare the file's SHA-256 digest with its line in the checksum file. For example:
 
 ```powershell
-Get-FileHash .\IB-Circlio-1.0.8-windows.zip -Algorithm SHA256
+Get-FileHash .\IB-Circlio-1.0.9-windows.zip -Algorithm SHA256
 ```
 
 The `VERSION` constant in `version.py` is the source version for the desktop app, local service, and portable build; the build synchronizes both packaged browser manifests to it.

@@ -1,3 +1,18 @@
+# IB Circlio v1.0.9
+
+## What's new
+
+- Ship one all-in-one Windows ZIP with `ib_circlio.exe`, quick-start instructions, and both browser extensions at the top level.
+- Add a direct download path for the complete Windows package and simplify the installation steps.
+- Wait longer at the bottom of dynamically loaded Instagram lists and test against delayed pagination and virtualized rows.
+- Use the IB Circlio logo as the project website's search favicon.
+- Redesign the project website with a responsive product preview, French/English language switch, concise setup guide, and FAQ.
+
+## Important notes
+
+- Chrome, Edge, Brave, and other Chromium browsers use `extensions\chromium`; Firefox uses `extensions\firefox`. Both are inside the same Windows ZIP.
+- Collection still depends on the accounts Instagram renders and exposes to the signed-in browser. Incomplete or short lists are saved as partial snapshots rather than treated as complete.
+
 # IB Circlio v1.0.8
 
 ## What's new

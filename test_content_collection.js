@@ -68,6 +68,7 @@ class FakeList {
     );
     this.pageSize = pageSize;
     this.loaded = Math.min(total, pageSize);
+    this.visibleStart = 0;
     this.delayedPageChecks = delayedPageChecks;
     this.waitingChecks = 0;
   }
@@ -128,6 +129,7 @@ function makeHarness(family, {
           },
           set scrollTop(value) {
             scrollTop = Math.min(value, Math.max(0, this.scrollHeight - this.clientHeight));
+            list.visibleStart = Math.floor(scrollTop / 40);
           },
           dispatchEvent() {
             if (this.scrollTop + this.clientHeight >= this.scrollHeight - 10) {
@@ -153,7 +155,7 @@ function makeHarness(family, {
           querySelectorAll(selector) {
             if (selector === "div") return [container];
             if (selector === "a[href]") {
-              return list.users.slice(0, list.loaded).map((username) =>
+              return list.users.slice(list.visibleStart, list.visibleStart + 10).map((username) =>
                 new FakeLink(username, { querySelectorAll: () => [] })
               );
             }
@@ -250,7 +252,7 @@ for (const family of ["chrome", "firefox"]) {
     const extension = makeHarness(family, {
       followerCount: 30,
       followingCount: 230,
-      delayedPageChecks: 5
+      delayedPageChecks: 10
     });
 
     const response = await extension.startCollection();
@@ -259,6 +261,14 @@ for (const family of ["chrome", "firefox"]) {
     assert.equal(response.collection.complete, true, response.error || "snapshot was incomplete");
     assert.equal(extension.savedCollection.followers.length, 30);
     assert.equal(extension.savedCollection.following.length, 230);
+    assert.deepEqual(
+      Array.from(extension.savedCollection.followers).sort(),
+      extension.lists.followers.users
+    );
+    assert.deepEqual(
+      Array.from(extension.savedCollection.following).sort(),
+      extension.lists.following.users
+    );
   });
 
   test(`${family}: reports and saves a header-count mismatch as partial`, async () => {

@@ -1,0 +1,32 @@
+IB Circlio - quick start (Windows)
+
+This single ZIP contains the desktop app and extensions for Chromium browsers
+(Chrome, Edge, Brave, and similar) and Firefox. You do not need to download
+another IB Circlio file or install Python.
+
+1. Extract the ZIP
+   In File Explorer, right-click the downloaded ZIP and choose "Extract All".
+   Open the extracted folder. You should see ib_circlio.exe and this guide.
+
+2. Start the desktop app
+   Double-click ib_circlio.exe. In the "Collection service" tab, click
+   "Start service" and wait until its status says "Running". Keep the app open.
+
+3. Load the extension for the browser you already use
+   Chrome, Edge, Brave, or another Chromium browser:
+   - Open the browser's Extensions page and turn on Developer mode.
+   - Choose "Load unpacked" and select the extensions\chromium folder inside
+     the extracted IB Circlio folder.
+
+   Firefox:
+   - Open about:debugging, choose "This Firefox", then "Load Temporary Add-on".
+   - Select manifest.json inside the extensions\firefox folder.
+   - Firefox temporary add-ons must be loaded again after Firefox closes.
+
+4. Collect a profile
+   Refresh any Instagram tab that was already open. In your signed-in browser,
+   open the profile and select IB Circlio to start the collection. Return to
+   the desktop app to review the saved results.
+
+The app and collection history stay on this PC. Leave the app open while
+collecting; close it when you are finished to stop the local service.
