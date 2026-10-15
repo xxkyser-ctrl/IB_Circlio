@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,16 +7,16 @@
   <link rel="icon" type="image/png" sizes="128x128" href="./ib-circlio.png">
   <link rel="apple-touch-icon" href="./ib-circlio.png">
   <link rel="canonical" href="https://xxkyser-ctrl.github.io/IB_Circlio/">
-  <meta name="description" content="IB Circlio (IB_Circlio) enregistre localement l’évolution des abonnés Instagram. Une application Windows et son extension navigateur, dans un seul téléchargement.">
+  <meta name="description" content="Track Instagram follower changes locally with IB Circlio (IB_Circlio). One Windows app and browser extension in one download.">
   <meta name="google-site-verification" content="voSEDeP78REnShvi4T-_ebT1R8O81O2QEtZWqp_nauQ">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="IB Circlio">
-  <meta property="og:title" content="IB Circlio — Suivez l’évolution de vos abonnés">
-  <meta property="og:description" content="Comparez vos listes Instagram au fil du temps. Vos données restent sur votre ordinateur.">
+  <meta property="og:title" content="IB Circlio — Track your follower history">
+  <meta property="og:description" content="Compare your Instagram lists over time. Your data stays on your computer.">
   <meta property="og:url" content="https://xxkyser-ctrl.github.io/IB_Circlio/">
   <meta property="og:image" content="https://xxkyser-ctrl.github.io/IB_Circlio/screenshots/demo-overview.png">
-  <meta property="og:image:alt" content="Aperçu de l’application IB Circlio">
-  <title>IB Circlio — Suivez l’évolution de vos abonnés</title>
+  <meta property="og:image:alt" content="IB Circlio app preview">
+  <title>IB Circlio — Track your follower history</title>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -96,9 +96,18 @@
     .hero-visual { position: relative; }
     .hero-visual::before { position: absolute; z-index: -1; inset: 8% -6% -7% 13%; border-radius: 26px; background: #e9e6fb; content: ""; transform: rotate(2.5deg); }
     .product-shot { overflow: hidden; margin: 0; padding: 9px; border: 1px solid #e5e3ee; border-radius: 15px; background: white; box-shadow: 0 28px 65px #28204418; }
-    .product-shot img { display: block; width: 100%; height: auto; border-radius: 8px; }
-    .shot-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 5px 1px; color: #686a80; font-size: .76rem; }
+    .shot-trigger { display: block; width: 100%; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: zoom-in; }
+    .shot-trigger img { display: block; width: 100%; height: auto; border-radius: 8px; }
+    .shot-caption { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 10px 5px 1px; color: #686a80; font-size: .76rem; }
     .shot-caption strong { color: #333348; font-weight: 670; }
+    .zoom-hint { color: var(--accent-dark); font-weight: 650; }
+    .image-dialog { position: fixed; width: fit-content; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); padding: 12px; overflow: visible; border: 1px solid #ffffff44; border-radius: 14px; background: #fff; box-shadow: 0 24px 80px #0006; }
+    .image-dialog[open] { display: grid; gap: 10px; }
+    .image-dialog::backdrop { background: #10101dcc; backdrop-filter: blur(3px); }
+    .image-dialog img { display: block; width: min(1200px, calc(100vw - 48px)); height: auto; max-height: calc(100vh - 92px); object-fit: contain; border-radius: 7px; }
+    .image-dialog h2 { margin: 0; color: #333348; font-size: .9rem; letter-spacing: 0; }
+    .image-dialog-close { position: absolute; top: 18px; right: 18px; display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #ffffffaa; border-radius: 50%; background: #202136dd; color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer; }
+    .image-dialog-close:hover { background: #202136; }
     .section { padding-block: 74px; }
     .section-white { border-block: 1px solid #efedf4; background: white; }
     .section-heading { max-width: 690px; margin: 0 auto 35px; text-align: center; }
@@ -197,8 +206,8 @@
           <a href="#faq" data-text="navFaq">FAQ</a>
         </nav>
         <div class="language" role="group" aria-label="Language / Langue">
-          <button type="button" data-set-language="fr" aria-pressed="true">FR</button>
-          <button type="button" data-set-language="en" aria-pressed="false">EN</button>
+          <button type="button" data-set-language="en" aria-pressed="true">EN</button>
+          <button type="button" data-set-language="fr" aria-pressed="false">FR</button>
         </div>
       </div>
     </div>
@@ -220,14 +229,23 @@
       </div>
       <div class="hero-visual">
         <figure class="product-shot">
-          <img src="./screenshots/demo-overview.png" alt="Aperçu du tableau de bord IB Circlio" data-alt-fr="Aperçu du tableau de bord IB Circlio" data-alt-en="Preview of the IB Circlio dashboard" width="1200" height="675" fetchpriority="high">
+          <button class="shot-trigger" id="screenshot-trigger" type="button" aria-haspopup="dialog" aria-controls="screenshot-dialog" aria-label="Agrandir la capture de l’application" data-label-fr="Agrandir la capture de l’application" data-label-en="Enlarge the app screenshot">
+            <img src="./screenshots/demo-overview.png" alt="Aperçu du tableau de bord IB Circlio" data-alt-fr="Aperçu du tableau de bord IB Circlio" data-alt-en="Preview of the IB Circlio dashboard" width="1200" height="675" fetchpriority="high">
+          </button>
           <figcaption class="shot-caption">
             <strong data-text="screenshotCaption">Votre tableau de bord, en un coup d’œil</strong>
+            <span class="zoom-hint" data-text="screenshotZoomHint">Cliquez pour agrandir</span>
             <span data-text="localBadge">Enregistré sur votre PC</span>
           </figcaption>
         </figure>
       </div>
     </section>
+
+    <dialog class="image-dialog" id="screenshot-dialog" aria-labelledby="screenshot-dialog-title">
+      <button class="image-dialog-close" id="screenshot-dialog-close" type="button" aria-label="Fermer l’aperçu agrandi" data-label-fr="Fermer l’aperçu agrandi" data-label-en="Close enlarged preview"><span aria-hidden="true">×</span></button>
+      <h2 id="screenshot-dialog-title" data-text="screenshotDialogTitle">Aperçu agrandi de l’application</h2>
+      <img src="./screenshots/demo-overview.png" alt="" width="1200" height="675">
+    </dialog>
 
     <section class="section section-white" id="features">
       <div class="wrap">
@@ -448,6 +466,8 @@
           navFaq: "FAQ",
           download: "Télécharger pour Windows",
           screenshotCaption: "Votre tableau de bord, en un coup d’œil",
+          screenshotZoomHint: "Cliquez pour agrandir",
+          screenshotDialogTitle: "Aperçu agrandi de l’application",
           localBadge: "Enregistré sur votre PC",
           featureCollectTitle: "Collectez vos listes",
           featureCollectBody: "L’extension lit les abonnés et abonnements affichés sur un profil Instagram.",
@@ -482,6 +502,8 @@
           navFaq: "FAQ",
           download: "Download for Windows",
           screenshotCaption: "Your dashboard, at a glance",
+          screenshotZoomHint: "Click to enlarge",
+          screenshotDialogTitle: "Enlarged app preview",
           localBadge: "Saved on your PC",
           featureCollectTitle: "Collect your lists",
           featureCollectBody: "The extension reads the followers and following shown on an Instagram profile.",
@@ -542,12 +564,37 @@
       }
 
       const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
-      setLanguage(requestedLanguage === "en" ? "en" : "fr", false);
+      setLanguage(requestedLanguage === "fr" ? "fr" : "en", false);
       for (const button of document.querySelectorAll("[data-set-language]")) {
         button.addEventListener("click", () => {
           setLanguage(button.dataset.setLanguage, true);
         });
       }
+
+      const screenshotTrigger = document.querySelector("#screenshot-trigger");
+      const screenshotDialog = document.querySelector("#screenshot-dialog");
+      const screenshotDialogClose = document.querySelector("#screenshot-dialog-close");
+      function closeScreenshotDialog() {
+        if (!screenshotDialog.open) return;
+        screenshotDialog.close();
+        screenshotTrigger.focus({ preventScroll: true });
+      }
+
+      screenshotTrigger.addEventListener("click", () => screenshotDialog.showModal());
+      screenshotDialogClose.addEventListener("click", closeScreenshotDialog);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && screenshotDialog.open) {
+          event.preventDefault();
+          closeScreenshotDialog();
+        }
+      });
+      screenshotDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeScreenshotDialog();
+      });
+      screenshotDialog.addEventListener("click", (event) => {
+        if (event.target === screenshotDialog) closeScreenshotDialog();
+      });
     })();
   </script>
 </body>
