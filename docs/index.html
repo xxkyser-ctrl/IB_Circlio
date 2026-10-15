@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,13 +25,13 @@
     "alternateName": "IB_Circlio",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Windows",
-    "description": "Application Windows et extension navigateur pour enregistrer et comparer localement les listes Instagram d'abonnés et d'abonnements.",
+    "description": "A Windows app and browser extension to save and compare Instagram follower and following lists locally.",
     "url": "https://xxkyser-ctrl.github.io/IB_Circlio/",
     "downloadUrl": "https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest/download/IB-Circlio-1.0.9-windows.zip",
     "codeRepository": "https://github.com/xxkyser-ctrl/IB_Circlio",
     "softwareVersion": "1.0.9",
     "image": "https://xxkyser-ctrl.github.io/IB_Circlio/ib-circlio.png",
-    "inLanguage": ["fr", "en"],
+    "inLanguage": ["en", "fr", "es", "ar", "de", "pt", "it", "zh", "ja", "ko", "nl", "tr", "ru", "hi"],
     "featureList": [
       "Historique des listes Instagram",
       "Comparaison des abonnés et abonnements",
@@ -77,9 +77,10 @@
     .header-right, .nav { display: flex; align-items: center; gap: 28px; }
     .nav a { color: #55566c; font-size: .9rem; font-weight: 570; text-decoration: none; }
     .nav a:hover, .footer a:hover { color: var(--accent); }
-    .language { display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: white; }
-    .language button { min-width: 38px; padding: 5px 8px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: .76rem; font-weight: 760; cursor: pointer; }
-    .language button[aria-pressed="true"] { background: var(--soft); color: var(--accent-dark); }
+    .language { display: flex; align-items: center; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: white; }
+    .language select { max-width: 190px; min-height: 34px; padding: 4px 28px 4px 10px; border: 0; border-radius: 999px; background: white; color: var(--accent-dark); font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+    .language select:focus-visible { outline-offset: 1px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
     .hero { display: grid; width: min(1280px, calc(100% - 48px)); grid-template-columns: .82fr 1.18fr; align-items: center; gap: clamp(36px, 5vw, 64px); overflow-x: clip; padding-block: 76px 84px; }
     .eyebrow { display: inline-flex; align-items: center; gap: 9px; margin: 0 0 18px; color: var(--accent-dark); font-size: .76rem; font-weight: 780; letter-spacing: .095em; text-transform: uppercase; }
     .eyebrow::before { width: 21px; height: 2px; background: #806eea; content: ""; }
@@ -108,6 +109,9 @@
     .image-dialog h2 { margin: 0; color: #333348; font-size: .9rem; letter-spacing: 0; }
     .image-dialog-close { position: absolute; top: 18px; right: 18px; display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #ffffffaa; border-radius: 50%; background: #202136dd; color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer; }
     .image-dialog-close:hover { background: #202136; }
+    html[dir="rtl"] h1, html[dir="rtl"] h2, html[dir="rtl"] h3, html[dir="rtl"] h4 { letter-spacing: normal; }
+    html[dir="rtl"] code, html[dir="rtl"] .button { direction: ltr; unicode-bidi: isolate; }
+    html[dir="rtl"] .image-dialog-close { right: auto; left: 18px; }
     .section { padding-block: 74px; }
     .section-white { border-block: 1px solid #efedf4; background: white; }
     .section-heading { max-width: 690px; margin: 0 auto 35px; text-align: center; }
@@ -131,11 +135,11 @@
     .browser-guide-heading .eyebrow { margin-bottom: 9px; }
     .browser-guide-heading h3 { margin-bottom: 5px; font-size: clamp(1.3rem, 3vw, 1.7rem); letter-spacing: -.035em; }
     .browser-guide-heading p:last-child { margin-bottom: 0; color: var(--muted); }
-    .browser-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-    .browser-option { padding: 22px; border: 1px solid #e6e4ef; border-radius: 12px; background: white; }
-    .browser-option h4 { margin: 0 0 13px; font-size: 1.02rem; }
+    .browser-options { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .browser-option { min-width: 0; padding: 22px; border: 1px solid #e6e4ef; border-radius: 12px; background: white; }
+    .browser-option h4 { margin: 0 0 13px; overflow-wrap: anywhere; font-size: 1.02rem; }
     .browser-option ol { display: grid; gap: 10px; margin: 0; padding-left: 22px; color: #55566c; font-size: .9rem; }
-    .browser-option li { padding-left: 3px; }
+    .browser-option li { padding-left: 3px; overflow-wrap: anywhere; }
     .browser-option code { overflow-wrap: anywhere; padding: 2px 5px; border-radius: 4px; background: #f0eff6; color: #3f387b; font-size: .84em; }
     .browser-note { margin: 15px 0 0; padding: 11px 13px; border-radius: 8px; background: #f7f6fb; color: #5f6075; font-size: .84rem; }
     .privacy-panel { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 21px; padding: 30px; border: 1px solid #e6e2fa; border-radius: 15px; background: #f2f0fc; }
@@ -200,15 +204,30 @@
         <span>IB Circlio</span>
       </a>
       <div class="header-right">
-        <nav class="nav" aria-label="Navigation principale">
-          <a href="#features" data-text="navFeatures">Fonctionnalités</a>
-          <a href="#guide" data-text="navGuide">Installation</a>
+        <nav class="nav" aria-label="Main navigation" data-aria="mainNav">
+          <a href="#features" data-text="navFeatures">Features</a>
+          <a href="#guide" data-text="navGuide">Get started</a>
           <a href="#faq" data-text="navFaq">FAQ</a>
         </nav>
-        <div class="language" role="group" aria-label="Language / Langue">
-          <button type="button" data-set-language="en" aria-pressed="true">EN</button>
-          <button type="button" data-set-language="fr" aria-pressed="false">FR</button>
-        </div>
+        <label class="language">
+          <span class="sr-only" id="language-label" data-text="languageLabel">Language</span>
+          <select id="language-select" aria-labelledby="language-label">
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="es">Español</option>
+            <option value="ar">العربية</option>
+            <option value="de">Deutsch</option>
+            <option value="pt">Português</option>
+            <option value="it">Italiano</option>
+            <option value="zh">中文（简体）</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="nl">Nederlands</option>
+            <option value="tr">Türkçe</option>
+            <option value="ru">Русский</option>
+            <option value="hi">हिन्दी</option>
+          </select>
+        </label>
       </div>
     </div>
   </header>
@@ -216,69 +235,64 @@
   <main>
     <section class="wrap hero" aria-labelledby="hero-title">
       <div class="hero-content">
-        <p class="eyebrow" data-text="heroEyebrow">Suivi Instagram · 100 % local</p>
-        <h1 id="hero-title"><span class="hero-line" data-text="heroTitleOne">Vos abonnés.</span><br><span data-text="heroTitleTwo">Votre historique.</span></h1>
-        <p class="hero-copy" data-text="heroDescription">Comprenez l’évolution de vos abonnés Instagram au fil du temps. Collectez, comparez et consultez vos listes depuis une seule application — vos données restent sur votre ordinateur.</p>
+        <p class="eyebrow" data-text="heroEyebrow">Instagram tracking · 100% local</p>
+        <h1 id="hero-title"><span class="hero-line" data-text="heroTitleOne">Your followers.</span><br><span data-text="heroTitleTwo">Your history.</span></h1>
+        <p class="hero-copy" data-text="heroDescription">Understand how your Instagram followers change over time. Collect, compare, and review your lists from one desktop app — your data stays on your computer.</p>
         <div class="hero-actions">
           <a class="button" href="https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest/download/IB-Circlio-1.0.9-windows.zip">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
-            <span data-text="download">Télécharger pour Windows</span>
+            <span data-text="download">Download for Windows</span>
           </a>
         </div>
-        <p class="hero-note" data-text="heroNote">Gratuit · Windows 10/11 · Application et extensions dans un seul ZIP</p>
+        <p class="hero-note" data-text="heroNote">Free · Windows 10/11 · App and browser extensions in one ZIP</p>
       </div>
       <div class="hero-visual">
         <figure class="product-shot">
-          <button class="shot-trigger" id="screenshot-trigger" type="button" aria-haspopup="dialog" aria-controls="screenshot-dialog" aria-label="Agrandir la capture de l’application" data-label-fr="Agrandir la capture de l’application" data-label-en="Enlarge the app screenshot">
-            <img src="./screenshots/demo-overview.png" alt="Aperçu du tableau de bord IB Circlio" data-alt-fr="Aperçu du tableau de bord IB Circlio" data-alt-en="Preview of the IB Circlio dashboard" width="1200" height="675" fetchpriority="high">
+          <button class="shot-trigger" id="screenshot-trigger" type="button" aria-haspopup="dialog" aria-controls="screenshot-dialog" aria-label="Enlarge the app screenshot" data-aria="screenshotTriggerLabel">
+            <img src="./screenshots/demo-overview.png" alt="Preview of the IB Circlio dashboard" data-alt-key="screenshotAlt" width="1200" height="675" fetchpriority="high">
           </button>
           <figcaption class="shot-caption">
-            <strong data-text="screenshotCaption">Votre tableau de bord, en un coup d’œil</strong>
-            <span class="zoom-hint" data-text="screenshotZoomHint">Cliquez pour agrandir</span>
-            <span data-text="localBadge">Enregistré sur votre PC</span>
+            <strong data-text="screenshotCaption">Your dashboard, at a glance</strong>
+            <span class="zoom-hint" data-text="screenshotZoomHint">Click to enlarge</span>
+            <span data-text="localBadge">Saved on your PC</span>
           </figcaption>
         </figure>
       </div>
     </section>
 
     <dialog class="image-dialog" id="screenshot-dialog" aria-labelledby="screenshot-dialog-title">
-      <button class="image-dialog-close" id="screenshot-dialog-close" type="button" aria-label="Fermer l’aperçu agrandi" data-label-fr="Fermer l’aperçu agrandi" data-label-en="Close enlarged preview"><span aria-hidden="true">×</span></button>
+      <button class="image-dialog-close" id="screenshot-dialog-close" type="button" aria-label="Close enlarged preview" data-aria="screenshotCloseLabel"><span aria-hidden="true">×</span></button>
       <h2 id="screenshot-dialog-title" data-text="screenshotDialogTitle">Aperçu agrandi de l’application</h2>
       <img src="./screenshots/demo-overview.png" alt="" width="1200" height="675">
     </dialog>
 
     <section class="section section-white" id="features">
       <div class="wrap">
-        <div class="section-heading" lang="fr" data-language="fr">
-          <p class="eyebrow">L’essentiel, simplement</p>
-          <h2>Suivez ce qui change.</h2>
-          <p>De la collecte au rapport, retrouvez l’essentiel dans une application pensée pour être simple à utiliser.</p>
-        </div>
-        <div class="section-heading" lang="en" data-language="en" hidden>
-          <p class="eyebrow">The essentials, made simple</p>
-          <h2>See what changes.</h2>
-          <p>From collection to reports, everything you need is in one easy-to-use desktop app.</p>
+        <div class="section-heading">
+          <p class="eyebrow" data-text="featuresEyebrow">The essentials, made simple</p>
+          <h2 data-text="featuresTitle">See what changes.</h2>
+          <p data-text="featuresDescription">From collection to reports, everything you need is in one easy-to-use desktop app.</p>
         </div>
         <div class="feature-grid">
           <article class="feature-card">
             <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5v1"/></svg></span>
-            <h3 data-text="featureCollectTitle">Collectez vos listes</h3>
-            <p data-text="featureCollectBody">L’extension lit les abonnés et abonnements affichés sur un profil Instagram.</p>
+            <h3 data-text="featureCollectTitle">Collect your lists</h3>
+            <p data-text="featureCollectBody">The extension reads the followers and following shown on an Instagram profile.</p>
           </article>
           <article class="feature-card">
             <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-5 5"/></svg></span>
-            <h3 data-text="featureCompareTitle">Comparez l’évolution</h3>
-            <p data-text="featureCompareBody">Comparez vos relevés pour retrouver les comptes ajoutés ou retirés.</p>
+            <h3 data-text="featureCompareTitle">Compare changes</h3>
+            <p data-text="featureCompareBody">Compare snapshots to see which accounts were added or removed.</p>
           </article>
           <article class="feature-card">
             <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span>
-            <h3 data-text="featureLocalTitle">Gardez la main</h3>
-            <p data-text="featureLocalBody">Votre historique est stocké dans une base de données locale sur votre PC.</p>
+            <h3 data-text="featureLocalTitle">Stay in control</h3>
+            <p data-text="featureLocalBody">Your history is stored in a local database on your PC.</p>
           </article>
           <article class="feature-card">
             <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></span>
-            <h3 data-text="featureReportTitle">Consultez et exportez</h3>
-            <p data-text="featureReportBody">Parcourez les relevés, recherchez un compte et exportez vos rapports Excel.</p>
+            <h3 data-text="featureReportTitle">Review and export</h3>
+            <p data-text="featureReportBody">Browse snapshots, search accounts, and export Excel reports.</p>
           </article>
         </div>
       </div>
@@ -286,75 +300,48 @@
 
     <section class="section" id="guide">
       <div class="wrap">
-        <div class="section-heading" lang="fr" data-language="fr">
-          <p class="eyebrow">Prêt en quelques minutes</p>
-          <h2>Trois étapes. C’est tout.</h2>
-          <p>Un téléchargement, votre navigateur habituel et votre compte Instagram.</p>
-        </div>
-        <div class="section-heading" lang="en" data-language="en" hidden>
-          <p class="eyebrow">Ready in minutes</p>
-          <h2>Three steps. That’s it.</h2>
-          <p>One download, your usual browser, and your Instagram account.</p>
+        <div class="section-heading">
+          <p class="eyebrow" data-text="guideEyebrow">Ready in minutes</p>
+          <h2 data-text="guideTitle">Three steps. That’s it.</h2>
+          <p data-text="guideDescription">One download, your usual browser, and your Instagram account.</p>
         </div>
         <div class="steps">
           <article class="step">
-            <h3 data-text="stepOneTitle">Décompressez et lancez</h3>
-            <p data-text="stepOneBody">Extrayez le ZIP, ouvrez <code>ib_circlio.exe</code> et démarrez le service local.</p>
+            <h3 data-text="stepOneTitle">Extract and launch</h3>
+            <p data-text="stepOneBody">Extract the ZIP, open ib_circlio.exe, and start the local service.</p>
           </article>
           <article class="step">
-            <h3 data-text="stepTwoTitle">Ajoutez l’extension</h3>
-            <p data-text="stepTwoBody">Choisissez votre navigateur habituel et suivez les étapes dédiées juste en dessous.</p>
+            <h3 data-text="stepTwoTitle">Add the extension</h3>
+            <p data-text="stepTwoBody">Choose your usual browser and follow the dedicated steps just below.</p>
           </article>
           <article class="step">
-            <h3 data-text="stepThreeTitle">Collectez et comparez</h3>
-            <p data-text="stepThreeBody">Ouvrez un profil Instagram, lancez la collecte et consultez les résultats dans l’application.</p>
+            <h3 data-text="stepThreeTitle">Collect and compare</h3>
+            <p data-text="stepThreeBody">Open an Instagram profile, start a collection, and review results in the app.</p>
           </article>
         </div>
         <div class="browser-guide">
-          <div class="browser-guide-heading" lang="fr" data-language="fr">
-            <p class="eyebrow">Installation de l’extension</p>
-            <h3>Choisissez votre navigateur</h3>
-            <p>Suivez simplement les étapes correspondant au navigateur que vous utilisez déjà.</p>
-          </div>
-          <div class="browser-guide-heading" lang="en" data-language="en" hidden>
-            <p class="eyebrow">Browser extension setup</p>
-            <h3>Choose your browser</h3>
-            <p>Just follow the steps for the browser you already use.</p>
+          <div class="browser-guide-heading">
+            <p class="eyebrow" data-text="browserEyebrow">Browser extension setup</p>
+            <h3 data-text="browserTitle">Choose your browser</h3>
+            <p data-text="browserDescription">Just follow the steps for the browser you already use.</p>
           </div>
           <div class="browser-options">
-            <article class="browser-option" lang="fr" data-language="fr">
-              <h4>Chrome, Edge, Brave, Opera, Vivaldi et autres navigateurs Chromium compatibles</h4>
+            <article class="browser-option">
+              <h4 data-text="chromiumTitle">Chrome, Edge, Brave, Opera, Vivaldi, and other compatible Chromium browsers</h4>
               <ol>
-                <li>Ouvrez la page des extensions de votre navigateur, par exemple <code>chrome://extensions</code>, <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code> ou <code>vivaldi://extensions</code>.</li>
-                <li>Activez le <strong>Mode développeur</strong>.</li>
-                <li>Cliquez sur <strong>Charger l’extension non empaquetée</strong> (<em>Load unpacked</em>), puis sélectionnez le dossier <code>extensions\chromium</code> extrait du ZIP.</li>
+                <li data-text="chromiumStepOne">Open your browser’s extensions page, for example <code>chrome://extensions</code>, <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code>, or <code>vivaldi://extensions</code>.</li>
+                <li data-text="chromiumStepTwo">Turn on <strong>Developer mode</strong>.</li>
+                <li data-text="chromiumStepThree">Click <strong>Load unpacked</strong>, then select the extracted <code>extensions\chromium</code> folder.</li>
               </ol>
             </article>
-            <article class="browser-option" lang="en" data-language="en" hidden>
-              <h4>Chrome, Edge, Brave, Opera, Vivaldi, and other compatible Chromium browsers</h4>
+            <article class="browser-option">
+              <h4 data-text="firefoxTitle">Firefox</h4>
               <ol>
-                <li>Open your browser’s extensions page, for example <code>chrome://extensions</code>, <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code>, or <code>vivaldi://extensions</code>.</li>
-                <li>Turn on <strong>Developer mode</strong>.</li>
-                <li>Click <strong>Load unpacked</strong>, then select the extracted <code>extensions\chromium</code> folder.</li>
+                <li data-text="firefoxStepOne">Open <code>about:debugging</code>, then choose <strong>This Firefox</strong>.</li>
+                <li data-text="firefoxStepTwo">Click <strong>Load Temporary Add-on…</strong>.</li>
+                <li data-text="firefoxStepThree">In the extracted ZIP folder, select <code>extensions\firefox\manifest.json</code>.</li>
               </ol>
-            </article>
-            <article class="browser-option" lang="fr" data-language="fr">
-              <h4>Firefox</h4>
-              <ol>
-                <li>Ouvrez <code>about:debugging</code>, puis choisissez <strong>Ce Firefox</strong>.</li>
-                <li>Cliquez sur <strong>Charger un module complémentaire temporaire…</strong>.</li>
-                <li>Dans le dossier extrait du ZIP, sélectionnez <code>extensions\firefox\manifest.json</code>.</li>
-              </ol>
-              <p class="browser-note">Dans Firefox, cette extension temporaire doit être rechargée après la fermeture du navigateur.</p>
-            </article>
-            <article class="browser-option" lang="en" data-language="en" hidden>
-              <h4>Firefox</h4>
-              <ol>
-                <li>Open <code>about:debugging</code>, then choose <strong>This Firefox</strong>.</li>
-                <li>Click <strong>Load Temporary Add-on…</strong>.</li>
-                <li>In the extracted ZIP folder, select <code>extensions\firefox\manifest.json</code>.</li>
-              </ol>
-              <p class="browser-note">In Firefox, reload this temporary extension after closing the browser.</p>
+              <p class="browser-note" data-text="firefoxNote">In Firefox, reload this temporary extension after closing the browser.</p>
             </article>
           </div>
         </div>
@@ -363,23 +350,12 @@
 
     <section class="section section-white" id="privacy">
       <div class="wrap">
-        <div class="privacy-panel" lang="fr" data-language="fr">
+        <div class="privacy-panel">
           <span class="privacy-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11"/><path d="m9 12 2 2 4-4"/></svg></span>
           <div>
-            <h2>Vos données restent chez vous.</h2>
-            <p>Les relevés sont enregistrés sur votre ordinateur, pas dans un compte cloud IB Circlio. L’extension transmet les données collectées au service local de votre PC. La collecte reflète ce qu’Instagram affiche au moment où vous l’effectuez.</p>
-            <nav class="privacy-links" aria-label="Informations et installation">
-              <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/INSTALL.txt" data-text="installGuide">Guide d’installation détaillé</a>
-              <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/docs/encryption.md" data-text="privacyDetails">Détails sur le chiffrement</a>
-            </nav>
-          </div>
-        </div>
-        <div class="privacy-panel" lang="en" data-language="en" hidden>
-          <span class="privacy-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11"/><path d="m9 12 2 2 4-4"/></svg></span>
-          <div>
-            <h2>Your data stays yours.</h2>
-            <p>Snapshots are saved on your computer, not in an IB Circlio cloud account. The extension sends collected data to the local service on your PC. Collections reflect what Instagram displays at the time you run them.</p>
-            <nav class="privacy-links" aria-label="Privacy and installation information">
+            <h2 data-text="privacyTitle">Your data stays yours.</h2>
+            <p data-text="privacyBody">Snapshots are saved on your computer, not in an IB Circlio cloud account. The extension sends collected data to the local service on your PC. Collections reflect what Instagram displays at the time you run them.</p>
+            <nav class="privacy-links" aria-label="Privacy and installation information" data-aria="privacyNav">
               <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/INSTALL.txt" data-text="installGuide">Detailed installation guide</a>
               <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/docs/encryption.md" data-text="privacyDetails">Encryption details</a>
             </nav>
@@ -390,48 +366,26 @@
 
     <section class="section" id="faq">
       <div class="wrap">
-        <div class="section-heading" lang="fr" data-language="fr">
-          <p class="eyebrow">Des réponses claires</p>
-          <h2>Questions fréquentes</h2>
+        <div class="section-heading">
+          <p class="eyebrow" data-text="faqEyebrow">Clear answers</p>
+          <h2 data-text="faqTitle">Frequently asked questions</h2>
         </div>
-        <div class="section-heading" lang="en" data-language="en" hidden>
-          <p class="eyebrow">Clear answers</p>
-          <h2>Frequently asked questions</h2>
-        </div>
-        <div class="faq" lang="fr" data-language="fr">
+        <div class="faq">
           <details>
-            <summary>Dois-je installer Chrome ou Firefox ?</summary>
-            <p>Non. Utilisez le navigateur que vous avez déjà. Le ZIP comprend l’extension pour Chrome, Edge, Brave et les autres navigateurs Chromium, ainsi que celle pour Firefox.</p>
+            <summary data-text="faqBrowserQuestion">Do I need to install Chrome or Firefox?</summary>
+            <p data-text="faqBrowserAnswer">No. Use the browser you already have. The ZIP includes the extension for Chrome, Edge, Brave, and other Chromium browsers, as well as Firefox.</p>
           </details>
           <details>
-            <summary>Où sont enregistrées mes données ?</summary>
-            <p>Sur votre PC, dans la base de données locale d’IB Circlio. L’historique de vos collections n’est pas envoyé vers un compte cloud IB Circlio.</p>
+            <summary data-text="faqDataQuestion">Where is my data stored?</summary>
+            <p data-text="faqDataAnswer">On your PC, in IB Circlio’s local database. Your collection history is not sent to an IB Circlio cloud account.</p>
           </details>
           <details>
-            <summary>La collecte peut-elle manquer des comptes ?</summary>
-            <p>La collecte dépend des éléments qu’Instagram affiche et charge dans le navigateur. Si la liste semble incomplète, IB Circlio marque le relevé comme partiel au lieu de le présenter comme une comparaison complète.</p>
+            <summary data-text="faqCollectionQuestion">Can the collection miss accounts?</summary>
+            <p data-text="faqCollectionAnswer">Collection depends on what Instagram displays and loads in your browser. If a list appears incomplete, IB Circlio marks the snapshot as partial rather than presenting it as a complete comparison.</p>
           </details>
           <details>
-            <summary>Pourquoi l’extension doit-elle être chargée dans le navigateur ?</summary>
-            <p>Elle lit les listes affichées dans votre session Instagram, puis transmet le résultat au service qui tourne localement sur votre ordinateur.</p>
-          </details>
-        </div>
-        <div class="faq" lang="en" data-language="en" hidden>
-          <details>
-            <summary>Do I need to install Chrome or Firefox?</summary>
-            <p>No. Use the browser you already have. The ZIP includes the extension for Chrome, Edge, Brave, and other Chromium browsers, as well as Firefox.</p>
-          </details>
-          <details>
-            <summary>Where is my data stored?</summary>
-            <p>On your PC, in IB Circlio’s local database. Your collection history is not sent to an IB Circlio cloud account.</p>
-          </details>
-          <details>
-            <summary>Can the collection miss accounts?</summary>
-            <p>Collection depends on what Instagram displays and loads in your browser. If a list appears incomplete, IB Circlio marks the snapshot as partial rather than presenting it as a complete comparison.</p>
-          </details>
-          <details>
-            <summary>Why does the extension need to be loaded in my browser?</summary>
-            <p>It reads the lists displayed in your Instagram session, then sends the results to the service running locally on your computer.</p>
+            <summary data-text="faqExtensionQuestion">Why does the extension need to be loaded in my browser?</summary>
+            <p data-text="faqExtensionAnswer">It reads the lists displayed in your Instagram session, then sends the results to the service running locally on your computer.</p>
           </details>
         </div>
       </div>
@@ -440,121 +394,55 @@
 
   <footer class="footer">
     <div class="wrap footer-inner">
-      <p lang="fr" data-language="fr">© 2026 IB Circlio · Projet GitHub : <strong>IB_Circlio</strong> · Indépendant, non affilié à Instagram ou Meta.</p>
-      <p lang="en" data-language="en" hidden>© 2026 IB Circlio · GitHub project: <strong>IB_Circlio</strong> · Independent, not affiliated with Instagram or Meta.</p>
-      <nav class="footer-links" aria-label="Liens du projet" data-label-fr="Liens du projet" data-label-en="Project links">
+      <p>© 2026 IB Circlio · <span data-text="footerProject">GitHub project</span>: <strong>IB_Circlio</strong> · <span data-text="footerDisclosure">Independent, not affiliated with Instagram or Meta.</span></p>
+      <nav class="footer-links" aria-label="Project links" data-aria="footerNav">
         <a href="https://github.com/xxkyser-ctrl/IB_Circlio">GitHub</a>
         <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/README.md" data-text="footerDocs">Documentation</a>
-        <a href="https://github.com/xxkyser-ctrl/IB_Circlio/issues" data-text="footerContact">Signaler un problème</a>
+        <a href="https://github.com/xxkyser-ctrl/IB_Circlio/issues" data-text="footerContact">Report an issue</a>
       </nav>
     </div>
   </footer>
 
+  <script src="./translations.js"></script>
   <script>
     (() => {
-      const translations = {
-        fr: {
-          title: "IB Circlio — Suivez l’évolution de vos abonnés",
-          description: "IB Circlio (IB_Circlio) enregistre localement l’évolution des abonnés Instagram. Une application Windows et son extension navigateur, dans un seul téléchargement.",
-        heroEyebrow: "Suivi Instagram · 100 % local",
-        heroTitleOne: "Vos abonnés.",
-        heroTitleTwo: "Votre historique.",
-        heroDescription: "Comprenez l’évolution de vos abonnés Instagram au fil du temps. Collectez, comparez et consultez vos listes depuis une seule application — vos données restent sur votre ordinateur.",
-        heroNote: "Gratuit · Windows 10/11 · Application et extensions dans un seul ZIP",
-          navFeatures: "Fonctionnalités",
-          navGuide: "Installation",
-          navFaq: "FAQ",
-          download: "Télécharger pour Windows",
-          screenshotCaption: "Votre tableau de bord, en un coup d’œil",
-          screenshotZoomHint: "Cliquez pour agrandir",
-          screenshotDialogTitle: "Aperçu agrandi de l’application",
-          localBadge: "Enregistré sur votre PC",
-          featureCollectTitle: "Collectez vos listes",
-          featureCollectBody: "L’extension lit les abonnés et abonnements affichés sur un profil Instagram.",
-          featureCompareTitle: "Comparez l’évolution",
-          featureCompareBody: "Comparez vos relevés pour retrouver les comptes ajoutés ou retirés.",
-          featureLocalTitle: "Gardez la main",
-          featureLocalBody: "Votre historique est stocké dans une base de données locale sur votre PC.",
-          featureReportTitle: "Consultez et exportez",
-          featureReportBody: "Parcourez les relevés, recherchez un compte et exportez vos rapports Excel.",
-          stepOneTitle: "Décompressez et lancez",
-          stepOneBody: "Extrayez le ZIP, ouvrez ib_circlio.exe et démarrez le service local.",
-          stepTwoTitle: "Ajoutez l’extension",
-          stepTwoBody: "Choisissez votre navigateur habituel et suivez les étapes dédiées juste en dessous.",
-          stepThreeTitle: "Collectez et comparez",
-          stepThreeBody: "Ouvrez un profil Instagram, lancez la collecte et consultez les résultats dans l’application.",
-          footerDocs: "Documentation",
-          footerContact: "Signaler un problème",
-          installGuide: "Guide d’installation détaillé",
-          privacyDetails: "Détails sur le chiffrement",
-          screenshotAlt: "Aperçu du tableau de bord IB Circlio"
-        },
-        en: {
-          title: "IB Circlio — Track your follower history",
-          description: "Track Instagram follower changes locally with IB Circlio (IB_Circlio). One Windows app and browser extension in one download.",
-          heroEyebrow: "Instagram tracking · 100% local",
-          heroTitleOne: "Your followers.",
-          heroTitleTwo: "Your history.",
-          heroDescription: "Understand how your Instagram followers change over time. Collect, compare, and review your lists from one desktop app — your data stays on your computer.",
-          heroNote: "Free · Windows 10/11 · App and browser extensions in one ZIP",
-          navFeatures: "Features",
-          navGuide: "Get started",
-          navFaq: "FAQ",
-          download: "Download for Windows",
-          screenshotCaption: "Your dashboard, at a glance",
-          screenshotZoomHint: "Click to enlarge",
-          screenshotDialogTitle: "Enlarged app preview",
-          localBadge: "Saved on your PC",
-          featureCollectTitle: "Collect your lists",
-          featureCollectBody: "The extension reads the followers and following shown on an Instagram profile.",
-          featureCompareTitle: "Compare changes",
-          featureCompareBody: "Compare snapshots to see which accounts were added or removed.",
-          featureLocalTitle: "Stay in control",
-          featureLocalBody: "Your history is stored in a local database on your PC.",
-          featureReportTitle: "Review and export",
-          featureReportBody: "Browse snapshots, search accounts, and export Excel reports.",
-          stepOneTitle: "Extract and launch",
-          stepOneBody: "Extract the ZIP, open ib_circlio.exe, and start the local service.",
-          stepTwoTitle: "Add the extension",
-          stepTwoBody: "Choose your usual browser and follow the dedicated steps just below.",
-          stepThreeTitle: "Collect and compare",
-          stepThreeBody: "Open an Instagram profile, start a collection, and review results in the app.",
-          footerDocs: "Documentation",
-          footerContact: "Report an issue",
-          installGuide: "Detailed installation guide",
-          privacyDetails: "Encryption details",
-          screenshotAlt: "Preview of the IB Circlio dashboard"
-        }
-      };
+      const translations = window.IB_CIRCLIO_TRANSLATIONS;
 
       function setLanguage(language, updateUrl) {
-        const selected = translations[language] ? language : "fr";
+        const selected = translations[language] ? language : "en";
         document.documentElement.lang = selected;
+        document.documentElement.dir = selected === "ar" ? "rtl" : "ltr";
         document.title = translations[selected].title;
         document.querySelector('meta[name="description"]')
           .setAttribute("content", translations[selected].description);
-
-        for (const element of document.querySelectorAll("[data-language]")) {
-          element.hidden = element.dataset.language !== selected;
-        }
+        document.querySelector('meta[property="og:title"]')
+          .setAttribute("content", translations[selected].title);
+        document.querySelector('meta[property="og:description"]')
+          .setAttribute("content", translations[selected].description);
+        document.querySelector('meta[property="og:image:alt"]')
+          .setAttribute("content", translations[selected].screenshotAlt);
         for (const element of document.querySelectorAll("[data-text]")) {
           const translation = translations[selected][element.dataset.text];
-          if (translation) element.textContent = translation;
+          if (translation === undefined) {
+            throw new Error(`Missing ${selected} translation: ${element.dataset.text}`);
+          }
+          element.textContent = translation;
         }
-        for (const button of document.querySelectorAll("[data-set-language]")) {
-          button.setAttribute(
-            "aria-pressed",
-            String(button.dataset.setLanguage === selected)
-          );
+        for (const element of document.querySelectorAll("[data-aria]")) {
+          const translation = translations[selected][element.dataset.aria];
+          if (translation === undefined) {
+            throw new Error(`Missing ${selected} accessible label: ${element.dataset.aria}`);
+          }
+          element.setAttribute("aria-label", translation);
         }
-        for (const nav of document.querySelectorAll("[data-label-fr]")) {
-          nav.setAttribute(
-            "aria-label",
-            selected === "fr" ? nav.dataset.labelFr : nav.dataset.labelEn
-          );
+        for (const element of document.querySelectorAll("[data-alt-key]")) {
+          const translation = translations[selected][element.dataset.altKey];
+          if (translation === undefined) {
+            throw new Error(`Missing ${selected} image description: ${element.dataset.altKey}`);
+          }
+          element.alt = translation;
         }
-        const screenshot = document.querySelector("[data-alt-fr]");
-        screenshot.alt = selected === "fr" ? screenshot.dataset.altFr : screenshot.dataset.altEn;
+        document.querySelector("#language-select").value = selected;
 
         if (updateUrl) {
           const url = new URL(window.location.href);
@@ -564,12 +452,10 @@
       }
 
       const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
-      setLanguage(requestedLanguage === "fr" ? "fr" : "en", false);
-      for (const button of document.querySelectorAll("[data-set-language]")) {
-        button.addEventListener("click", () => {
-          setLanguage(button.dataset.setLanguage, true);
-        });
-      }
+      setLanguage(translations[requestedLanguage] ? requestedLanguage : "en", false);
+      document.querySelector("#language-select").addEventListener("change", (event) => {
+        setLanguage(event.target.value, true);
+      });
 
       const screenshotTrigger = document.querySelector("#screenshot-trigger");
       const screenshotDialog = document.querySelector("#screenshot-dialog");
