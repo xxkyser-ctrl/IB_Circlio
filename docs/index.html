@@ -117,14 +117,25 @@
     .step::before { display: grid; width: 36px; height: 36px; margin-bottom: 20px; place-items: center; border-radius: 50%; background: var(--soft); color: var(--accent-dark); font-size: .85rem; font-weight: 800; content: counter(guide, decimal-leading-zero); }
     .step h3 { margin-bottom: 8px; font-size: 1rem; font-weight: 720; }
     .step p { margin-bottom: 0; color: var(--muted); font-size: .88rem; }
-    .step-details { margin-top: 12px; color: #57596e; font-size: .82rem; }
-    .step-details summary { width: fit-content; color: var(--accent-dark); font-weight: 660; cursor: pointer; }
-    .step-details p { margin: 7px 0 0; font-size: .82rem; }
+    .browser-guide { margin-top: 28px; padding: clamp(22px, 4vw, 36px); border: 1px solid #e5e1f7; border-radius: 16px; background: #f2f0fc; }
+    .browser-guide-heading { margin-bottom: 20px; }
+    .browser-guide-heading .eyebrow { margin-bottom: 9px; }
+    .browser-guide-heading h3 { margin-bottom: 5px; font-size: clamp(1.3rem, 3vw, 1.7rem); letter-spacing: -.035em; }
+    .browser-guide-heading p:last-child { margin-bottom: 0; color: var(--muted); }
+    .browser-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .browser-option { padding: 22px; border: 1px solid #e6e4ef; border-radius: 12px; background: white; }
+    .browser-option h4 { margin: 0 0 13px; font-size: 1.02rem; }
+    .browser-option ol { display: grid; gap: 10px; margin: 0; padding-left: 22px; color: #55566c; font-size: .9rem; }
+    .browser-option li { padding-left: 3px; }
+    .browser-option code { overflow-wrap: anywhere; padding: 2px 5px; border-radius: 4px; background: #f0eff6; color: #3f387b; font-size: .84em; }
+    .browser-note { margin: 15px 0 0; padding: 11px 13px; border-radius: 8px; background: #f7f6fb; color: #5f6075; font-size: .84rem; }
     .privacy-panel { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 21px; padding: 30px; border: 1px solid #e6e2fa; border-radius: 15px; background: #f2f0fc; }
     .privacy-icon { display: grid; width: 49px; height: 49px; place-items: center; border-radius: 14px; background: white; color: var(--accent); }
     .privacy-icon svg { width: 24px; height: 24px; }
     .privacy-panel h2 { margin-bottom: 8px; font-size: 1.45rem; }
     .privacy-panel p { max-width: 800px; margin-bottom: 0; color: #5f6075; font-size: .93rem; }
+    .privacy-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; }
+    .privacy-links a { color: var(--accent-dark); font-size: .87rem; font-weight: 680; text-underline-offset: 3px; }
     .faq { max-width: 800px; margin-inline: auto; border-top: 1px solid var(--line); }
     .faq details { border-bottom: 1px solid var(--line); }
     .faq summary { position: relative; padding: 18px 32px 18px 0; color: #303045; font-size: .96rem; font-weight: 660; cursor: pointer; list-style: none; }
@@ -142,6 +153,7 @@
       .hero { grid-template-columns: 1fr 1fr; gap: 35px; padding-block: 60px 68px; }
       h1 { font-size: clamp(2.8rem, 7vw, 4rem); }
       .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .browser-options { grid-template-columns: 1fr; }
     }
     @media (max-width: 650px) {
       .wrap { width: min(100% - 34px, 520px); }
@@ -273,16 +285,60 @@
           </article>
           <article class="step">
             <h3 data-text="stepTwoTitle">Ajoutez l’extension</h3>
-            <p data-text="stepTwoBody">Choisissez votre navigateur habituel. Chrome, Edge, Brave et Firefox sont pris en charge.</p>
-            <details class="step-details">
-              <summary data-text="stepTwoMore">Afficher les étapes pour votre navigateur</summary>
-              <p data-text="stepTwoInstructions">Chrome, Edge ou Brave : Extensions → Mode développeur → Load unpacked → extensions\chromium. Firefox : about:debugging → This Firefox → Load Temporary Add-on → extensions\firefox\manifest.json.</p>
-            </details>
+            <p data-text="stepTwoBody">Choisissez votre navigateur habituel et suivez les étapes dédiées juste en dessous.</p>
           </article>
           <article class="step">
             <h3 data-text="stepThreeTitle">Collectez et comparez</h3>
             <p data-text="stepThreeBody">Ouvrez un profil Instagram, lancez la collecte et consultez les résultats dans l’application.</p>
           </article>
+        </div>
+        <div class="browser-guide">
+          <div class="browser-guide-heading" lang="fr" data-language="fr">
+            <p class="eyebrow">Installation de l’extension</p>
+            <h3>Choisissez votre navigateur</h3>
+            <p>Suivez simplement les étapes correspondant au navigateur que vous utilisez déjà.</p>
+          </div>
+          <div class="browser-guide-heading" lang="en" data-language="en" hidden>
+            <p class="eyebrow">Browser extension setup</p>
+            <h3>Choose your browser</h3>
+            <p>Just follow the steps for the browser you already use.</p>
+          </div>
+          <div class="browser-options">
+            <article class="browser-option" lang="fr" data-language="fr">
+              <h4>Chrome, Edge, Brave, Opera, Vivaldi et autres navigateurs Chromium compatibles</h4>
+              <ol>
+                <li>Ouvrez la page des extensions de votre navigateur, par exemple <code>chrome://extensions</code>, <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code> ou <code>vivaldi://extensions</code>.</li>
+                <li>Activez le <strong>Mode développeur</strong>.</li>
+                <li>Cliquez sur <strong>Charger l’extension non empaquetée</strong> (<em>Load unpacked</em>), puis sélectionnez le dossier <code>extensions\chromium</code> extrait du ZIP.</li>
+              </ol>
+            </article>
+            <article class="browser-option" lang="en" data-language="en" hidden>
+              <h4>Chrome, Edge, Brave, Opera, Vivaldi, and other compatible Chromium browsers</h4>
+              <ol>
+                <li>Open your browser’s extensions page, for example <code>chrome://extensions</code>, <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code>, or <code>vivaldi://extensions</code>.</li>
+                <li>Turn on <strong>Developer mode</strong>.</li>
+                <li>Click <strong>Load unpacked</strong>, then select the extracted <code>extensions\chromium</code> folder.</li>
+              </ol>
+            </article>
+            <article class="browser-option" lang="fr" data-language="fr">
+              <h4>Firefox</h4>
+              <ol>
+                <li>Ouvrez <code>about:debugging</code>, puis choisissez <strong>Ce Firefox</strong>.</li>
+                <li>Cliquez sur <strong>Charger un module complémentaire temporaire…</strong>.</li>
+                <li>Dans le dossier extrait du ZIP, sélectionnez <code>extensions\firefox\manifest.json</code>.</li>
+              </ol>
+              <p class="browser-note">Dans Firefox, cette extension temporaire doit être rechargée après la fermeture du navigateur.</p>
+            </article>
+            <article class="browser-option" lang="en" data-language="en" hidden>
+              <h4>Firefox</h4>
+              <ol>
+                <li>Open <code>about:debugging</code>, then choose <strong>This Firefox</strong>.</li>
+                <li>Click <strong>Load Temporary Add-on…</strong>.</li>
+                <li>In the extracted ZIP folder, select <code>extensions\firefox\manifest.json</code>.</li>
+              </ol>
+              <p class="browser-note">In Firefox, reload this temporary extension after closing the browser.</p>
+            </article>
+          </div>
         </div>
       </div>
     </section>
@@ -294,6 +350,10 @@
           <div>
             <h2>Vos données restent chez vous.</h2>
             <p>Les relevés sont enregistrés sur votre ordinateur, pas dans un compte cloud IB Circlio. L’extension transmet les données collectées au service local de votre PC. La collecte reflète ce qu’Instagram affiche au moment où vous l’effectuez.</p>
+            <nav class="privacy-links" aria-label="Informations et installation">
+              <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/INSTALL.txt" data-text="installGuide">Guide d’installation détaillé</a>
+              <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/docs/encryption.md" data-text="privacyDetails">Détails sur le chiffrement</a>
+            </nav>
           </div>
         </div>
         <div class="privacy-panel" lang="en" data-language="en" hidden>
@@ -301,6 +361,10 @@
           <div>
             <h2>Your data stays yours.</h2>
             <p>Snapshots are saved on your computer, not in an IB Circlio cloud account. The extension sends collected data to the local service on your PC. Collections reflect what Instagram displays at the time you run them.</p>
+            <nav class="privacy-links" aria-label="Privacy and installation information">
+              <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/INSTALL.txt" data-text="installGuide">Detailed installation guide</a>
+              <a href="https://github.com/xxkyser-ctrl/IB_Circlio/blob/main/docs/encryption.md" data-text="privacyDetails">Encryption details</a>
+            </nav>
           </div>
         </div>
       </div>
@@ -396,13 +460,13 @@
           stepOneTitle: "Décompressez et lancez",
           stepOneBody: "Extrayez le ZIP, ouvrez ib_circlio.exe et démarrez le service local.",
           stepTwoTitle: "Ajoutez l’extension",
-          stepTwoBody: "Choisissez votre navigateur habituel. Chrome, Edge, Brave et Firefox sont pris en charge.",
-          stepTwoMore: "Afficher les étapes pour votre navigateur",
-          stepTwoInstructions: "Chrome, Edge ou Brave : Extensions → Mode développeur → Load unpacked → extensions\\chromium. Firefox : about:debugging → This Firefox → Load Temporary Add-on → extensions\\firefox\\manifest.json. Firefox charge les extensions temporaires jusqu’à sa fermeture.",
+          stepTwoBody: "Choisissez votre navigateur habituel et suivez les étapes dédiées juste en dessous.",
           stepThreeTitle: "Collectez et comparez",
           stepThreeBody: "Ouvrez un profil Instagram, lancez la collecte et consultez les résultats dans l’application.",
           footerDocs: "Documentation",
           footerContact: "Signaler un problème",
+          installGuide: "Guide d’installation détaillé",
+          privacyDetails: "Détails sur le chiffrement",
           screenshotAlt: "Aperçu du tableau de bord IB Circlio"
         },
         en: {
@@ -430,13 +494,13 @@
           stepOneTitle: "Extract and launch",
           stepOneBody: "Extract the ZIP, open ib_circlio.exe, and start the local service.",
           stepTwoTitle: "Add the extension",
-          stepTwoBody: "Choose your usual browser. Chrome, Edge, Brave, and Firefox are supported.",
-          stepTwoMore: "Show browser setup instructions",
-          stepTwoInstructions: "Chrome, Edge, or Brave: Extensions → Developer mode → Load unpacked → extensions\\chromium. Firefox: about:debugging → This Firefox → Load Temporary Add-on → extensions\\firefox\\manifest.json. Firefox temporary add-ons must be loaded again after Firefox closes.",
+          stepTwoBody: "Choose your usual browser and follow the dedicated steps just below.",
           stepThreeTitle: "Collect and compare",
           stepThreeBody: "Open an Instagram profile, start a collection, and review results in the app.",
           footerDocs: "Documentation",
           footerContact: "Report an issue",
+          installGuide: "Detailed installation guide",
+          privacyDetails: "Encryption details",
           screenshotAlt: "Preview of the IB Circlio dashboard"
         }
       };
