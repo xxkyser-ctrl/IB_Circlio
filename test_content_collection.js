@@ -34,6 +34,10 @@ class FakeLink {
   }
 
   scrollIntoView() {}
+
+  dispatchEvent(event) {
+    this.row.parentElement.dispatchEvent(event);
+  }
 }
 
 class FakeCloseButton {
@@ -95,6 +99,7 @@ function makeHarness(family, {
   delayedPageMs = 0,
   stuckScroll = false,
   scrollableDecoy = false,
+  scrollableRows = false,
   visibleLinkCount = 10
 }) {
   const lists = {
@@ -157,6 +162,28 @@ function makeHarness(family, {
           dialog = null;
           currentList = null;
         });
+        const visibleLinks = () =>
+          list.users.slice(
+            list.visibleStart, list.visibleStart + visibleLinkCount
+          ).map((username) => {
+            const row = {
+              parentElement: container,
+              clientHeight: scrollableRows ? 30 : 0,
+              scrollHeight: scrollableRows ? 10000 : 0,
+              scrollTop: 0,
+              querySelectorAll: () => []
+            };
+            const link = new FakeLink(username, row);
+            row.querySelectorAll = (selector) =>
+              selector === "a[href]" ? [link] : [];
+            return link;
+          });
+        container.querySelectorAll = (selector) =>
+          selector === "a[href]" ? visibleLinks() : [];
+        if (decoyContainer) {
+          decoyContainer.querySelectorAll = (selector) =>
+            selector === "a[href]" ? visibleLinks() : [];
+        }
         dialog = {
           get scrollHeight() {
             return container.scrollHeight;
@@ -171,19 +198,13 @@ function makeHarness(family, {
           dispatchEvent() {},
           querySelectorAll(selector) {
             if (selector === "div") {
-              return decoyContainer ? [decoyContainer, container] : [container];
+              return [
+                ...(decoyContainer ? [decoyContainer] : []),
+                container,
+                ...visibleLinks().map((link) => link.row)
+              ];
             }
-            if (selector === "a[href]") {
-              return list.users.slice(
-                list.visibleStart, list.visibleStart + visibleLinkCount
-              ).map((username) => {
-                const row = {
-                  parentElement: container,
-                  querySelectorAll: () => []
-                };
-                return new FakeLink(username, row);
-              });
-            }
+            if (selector === "a[href]") return visibleLinks();
             if (selector.startsWith("button")) return [closeButton];
             return [];
           }
@@ -358,8 +379,10 @@ for (const family of ["chrome", "firefox"]) {
     const extension = makeHarness(family, {
       followerCount: 434,
       followingCount: 230,
+      followerHeader: "434 followers",
       delayedPageMs: 1100,
       scrollableDecoy: true,
+      scrollableRows: true,
       visibleLinkCount: 14
     });
 

@@ -47,26 +47,29 @@ const ext = globalThis.browser ?? globalThis.chrome;
       const style = getComputedStyle(element);
       return scrollRange(element) > 10 &&
         element.clientHeight > 0 &&
-      (style.overflowY === "auto" || style.overflowY === "scroll" ||
-        style.overflowY === "hidden");
+        (style.overflowY === "auto" || style.overflowY === "scroll" ||
+          style.overflowY === "hidden");
     };
-    const candidates = new Set(
-      [...dialog.querySelectorAll("div")].filter(isScrollable)
-    );
-    if (isScrollable(dialog)) candidates.add(dialog);
-
-    for (const link of dialog.querySelectorAll("a[href]")) {
-      if (!usernameFromHref(link.getAttribute("href"))) continue;
-      let ancestor = link.parentElement;
-      while (ancestor && ancestor !== dialog) {
-        if (candidates.has(ancestor)) return ancestor;
-        ancestor = ancestor.parentElement;
+    const candidates = [...dialog.querySelectorAll("div")].filter(isScrollable);
+    if (isScrollable(dialog)) candidates.push(dialog);
+    const accountsPerContainer = (element) => {
+      const accounts = new Set();
+      for (const link of element.querySelectorAll("a[href]")) {
+        const username = usernameFromHref(link.getAttribute("href"));
+        if (username) accounts.add(username);
       }
-    }
-
-    return [...candidates].sort((left, right) =>
-      scrollRange(left) - scrollRange(right)
-    )[0] || dialog;
+      return accounts.size;
+    };
+    return candidates
+      .map((element) => ({
+        element,
+        accounts: accountsPerContainer(element),
+        range: scrollRange(element)
+      }))
+      .filter((candidate) => candidate.accounts > 0)
+      .sort((left, right) =>
+        right.accounts - left.accounts || left.range - right.range
+      )[0]?.element || dialog;
   }
 
   function extractUsernames(dialog, users, avatars, targetCount = null) {
@@ -110,12 +113,17 @@ const ext = globalThis.browser ?? globalThis.chrome;
       );
       if (targetCount !== null && users.size >= targetCount) break;
       const step = Math.max(240, Math.floor(Math.max(container.clientHeight, 300) * 0.85));
+      const accountLinks = [...liveDialog.querySelectorAll("a[href]")]
+        .filter((link) => usernameFromHref(link.getAttribute("href")));
+      accountLinks[accountLinks.length - 1]?.scrollIntoView({ block: "end" });
       container.scrollTop = Math.min(container.scrollTop + step, container.scrollHeight);
-      container.dispatchEvent(new WheelEvent("wheel", {
+      const scrollEvent = new WheelEvent("wheel", {
         bubbles: true,
         cancelable: true,
         deltaY: step
-      }));
+      });
+      (accountLinks[accountLinks.length - 1] || container)
+        .dispatchEvent(scrollEvent);
       await sleep(900);
       const refreshedDialog = findDialog();
       if (!refreshedDialog) throw new Error(`${listType} dialog closed during scan.`);
