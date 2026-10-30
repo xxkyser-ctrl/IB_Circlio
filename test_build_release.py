@@ -64,8 +64,11 @@ class BrowserPackageBuildTests(unittest.TestCase):
             package = root / "application"
             (package / "extensions" / "chromium").mkdir(parents=True)
             (package / "extensions" / "firefox").mkdir(parents=True)
+            (package / "icons").mkdir()
             (package / "ib_circlio.exe").write_bytes(b"app")
             (package / "INSTALL.txt").write_text("quick start", encoding="utf-8")
+            (package / "icons" / "ib-circlio.ico").write_bytes(b"icon")
+            (package / "icons" / "ib-128.png").write_bytes(b"png")
             (package / "extensions" / "chromium" / "manifest.json").write_text(
                 "{}", encoding="utf-8"
             )
@@ -83,6 +86,8 @@ class BrowserPackageBuildTests(unittest.TestCase):
             self.assertIn("INSTALL.txt", names)
             self.assertIn("extensions/chromium/manifest.json", names)
             self.assertIn("extensions/firefox/manifest.json", names)
+            self.assertIn("icons/ib-circlio.ico", names)
+            self.assertIn("icons/ib-128.png", names)
             self.assertFalse(any(name.startswith("application/") for name in names))
 
 

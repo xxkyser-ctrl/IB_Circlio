@@ -10,6 +10,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
     "accounts", "direct", "explore", "reel", "reels", "stories", "p", "tv", "create"
   ]);
   const STABLE_BOTTOM_ATTEMPTS = 12;
+  const MAX_STALLED_ATTEMPTS = 20;
   const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
   function sendRuntimeMessage(message) {
@@ -56,9 +57,10 @@ const ext = globalThis.browser ?? globalThis.chrome;
     return selected;
   }
 
-  function extractUsernames(dialog, users, avatars) {
+  function extractUsernames(dialog, users, avatars, targetCount = null) {
     let added = 0;
     for (const link of dialog.querySelectorAll("a[href]")) {
+      if (targetCount !== null && users.size >= targetCount) break;
       const username = usernameFromHref(link.getAttribute("href"));
       if (username && !users.has(username)) {
         users.add(username);
@@ -79,9 +81,10 @@ const ext = globalThis.browser ?? globalThis.chrome;
     return added;
   }
 
-  async function scanDialog(listType, avatars) {
+  async function scanDialog(listType, avatars, targetCount = null) {
     const dialog = findDialog();
     if (!dialog) throw new Error(`${listType} dialog not detected.`);
+    if (targetCount === 0) return [];
     const users = new Set();
     let stableAttempts = 0;
     let attempts = 0;
@@ -90,7 +93,9 @@ const ext = globalThis.browser ?? globalThis.chrome;
       const liveDialog = findDialog();
       if (!liveDialog) throw new Error(`${listType} dialog closed during scan.`);
       const container = findScrollContainer(liveDialog);
-      const addedBeforeScroll = extractUsernames(liveDialog, users, avatars);
+      const addedBeforeScroll = extractUsernames(
+        liveDialog, users, avatars, targetCount
+      );
       const previousTop = container.scrollTop;
       const step = Math.max(240, Math.floor(Math.max(container.clientHeight, 300) * 0.85));
       container.scrollTop = Math.min(container.scrollTop + step, container.scrollHeight);
@@ -103,23 +108,33 @@ const ext = globalThis.browser ?? globalThis.chrome;
       const refreshedDialog = findDialog();
       if (!refreshedDialog) throw new Error(`${listType} dialog closed during scan.`);
       const refreshedContainer = findScrollContainer(refreshedDialog);
-      const addedAfterScroll = extractUsernames(refreshedDialog, users, avatars);
+      const addedAfterScroll = extractUsernames(
+        refreshedDialog, users, avatars, targetCount
+      );
       const added = addedBeforeScroll + addedAfterScroll;
       attempts += 1;
       sendCollectionState(true, `Scanning ${listType}: ${users.size} usernames found`, {
         listType, count: users.size, attempts
       });
 
+      if (targetCount !== null && users.size >= targetCount) break;
+
       const moved = refreshedContainer.scrollTop > previousTop + 2;
       const atBottom = refreshedContainer.scrollTop + refreshedContainer.clientHeight >= refreshedContainer.scrollHeight - 10;
       if (added === 0 && !moved) stableAttempts += 1;
       else stableAttempts = 0;
+      if (atBottom && stableAttempts >= STABLE_BOTTOM_ATTEMPTS) break;
+      if (!atBottom && stableAttempts >= MAX_STALLED_ATTEMPTS) {
+        throw new Error(
+          `${listType} list stopped making progress before the end; ` +
+          `${users.size} usernames were collected. The snapshot is partial.`
+        );
+      }
       if (!moved && added === 0) {
         const visibleLinks = [...refreshedDialog.querySelectorAll("a[href]")].filter((link) => link.offsetParent !== null);
         visibleLinks[visibleLinks.length - 1]?.scrollIntoView({ block: "end" });
         await sleep(500);
       }
-      if (stableAttempts >= STABLE_BOTTOM_ATTEMPTS && atBottom) break;
     }
     if (attempts >= 400 && !state.stopRequested) {
       throw new Error(`${listType} scan reached the safety limit; this snapshot will be saved as partial.`);
@@ -240,6 +255,15 @@ const ext = globalThis.browser ?? globalThis.chrome;
     ].filter(Boolean).join(" | ").replace(/\s+/g, " ").trim().slice(0, 300);
   }
 
+  function headerTotalIsExact(listType) {
+    const text = headerTotalLabel(listType)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+    const match = text.match(/(\d[\d.,\s]*[kmb]?\+?)\s*([a-z()]+)/i);
+    return Boolean(match && !/[kmb+]/i.test(match[1]));
+  }
+
   async function openList(listType) {
     if (findDialog()) await closeDialog();
     const link = profileLink(listType);
@@ -303,14 +327,24 @@ const ext = globalThis.browser ?? globalThis.chrome;
         if (state.stopRequested) break;
         sendCollectionState(true, `Opening ${listType}...`);
         await openList(listType);
-        result[listType] = await scanDialog(listType, result.avatars);
         const headerTotalCount = result.headerTotals[listType];
+        const exactHeaderTotal = headerTotalIsExact(listType)
+          ? headerTotalCount
+          : null;
+        result[listType] = await scanDialog(
+          listType, result.avatars, exactHeaderTotal
+        );
         if (
           headerTotalCount !== null &&
-          result[listType].length < headerTotalCount
+          (exactHeaderTotal !== null
+            ? result[listType].length !== exactHeaderTotal
+            : result[listType].length < headerTotalCount)
         ) {
+          const expected = exactHeaderTotal === null
+            ? `at least ${headerTotalCount}`
+            : `${headerTotalCount}`;
           throw new Error(
-            `Only ${result[listType].length} ${listType} were collected, but the profile shows at least ${headerTotalCount}. The snapshot is partial; try again after the list finishes loading.`
+            `Only ${result[listType].length} ${listType} were collected, but the profile shows ${expected}. The snapshot is partial; try again after the list finishes loading.`
           );
         }
         await closeDialog();

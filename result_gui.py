@@ -61,6 +61,30 @@ def set_windows_app_user_model_id():
         )
 
 
+def application_directory():
+    return (
+        Path(sys.executable).parent
+        if getattr(sys, "frozen", False)
+        else Path(__file__).resolve().parent
+    )
+
+
+def apply_app_icon(window, app_directory):
+    icon = Path(app_directory) / "icons" / "ib-circlio.ico"
+    if icon.is_file():
+        window.iconbitmap(str(icon))
+    png_icon = Path(app_directory) / "icons" / "ib-128.png"
+    image = getattr(window, "_ib_circlio_icon_image", None)
+    if image is None:
+        image = getattr(getattr(window, "master", None), "_ib_circlio_icon_image", None)
+    if image is None and png_icon.is_file():
+        image = tk.PhotoImage(file=str(png_icon), master=window)
+    if image is not None:
+        window._ib_circlio_icon_image = image
+        window.iconphoto(True, image)
+    return image
+
+
 def compare_members(connection, profile, from_snapshot, to_snapshot, relationships):
     """Return snapshot membership differences for the selected relationships."""
     before = result.collection_for_date(connection, profile, from_snapshot)
@@ -248,6 +272,21 @@ def snapshot_choices(connection, profile):
     return [(snapshot_label(row[0], row[1]), row[0]) for row in rows]
 
 
+def delete_snapshot(connection, collection_id):
+    connection.execute("PRAGMA foreign_keys = ON")
+    if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+        raise RuntimeError("Snapshot deletion requires SQLite foreign keys.")
+    try:
+        cursor = connection.execute(
+            "DELETE FROM collections WHERE id = ?", (collection_id,)
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    return cursor.rowcount == 1
+
+
 def matching_tree_items(items, query):
     """Return table item IDs whose displayed values contain the search text."""
     normalized_query = query.strip().casefold()
@@ -267,9 +306,7 @@ class CirclioReportApp:
         self.data_dir = Path(data_dir)
         self.child_key_required = False
         self.app_directory = (
-            Path(sys.executable).parent
-            if getattr(sys, "frozen", False)
-            else Path(__file__).resolve().parent
+            application_directory()
         )
         self.server_process = None
         self.server_stopping = False
@@ -312,18 +349,13 @@ class CirclioReportApp:
         self.tree_items = {}
         self.tree_search_vars = {}
         self.tree_search_status = {}
+        self.snapshot_context_menu = None
         self.excel_icon = self._make_excel_icon()
         self.root.title("IB_Circlio")
         self.root.geometry("1240x840")
         self.root.minsize(980, 680)
         self.root.configure(background=BACKGROUND)
-        icon = self.app_directory / "icons" / "ib-circlio.ico"
-        if icon.is_file():
-            self.root.iconbitmap(str(icon))
-        png_icon = self.app_directory / "icons" / "ib-128.png"
-        self.app_icon = tk.PhotoImage(file=str(png_icon)) if png_icon.is_file() else None
-        if self.app_icon is not None:
-            self.root.iconphoto(True, self.app_icon)
+        self.app_icon = apply_app_icon(self.root, self.app_directory)
         self._configure_styles()
         self._build_layout()
         self.root.bind_all("<Button-1>", self._close_avatar_on_app_click, add="+")
@@ -984,11 +1016,20 @@ class CirclioReportApp:
             buttons, text="Create Excel report",
             command=lambda: self._export_selected(self.latest_collection)
         ).pack(side="left", padx=8)
-        ttk.Label(tab, text="Recent snapshots", style="Section.TLabel").pack(anchor="w", pady=(2, 10))
+        snapshot_heading = ttk.Frame(tab)
+        snapshot_heading.pack(fill="x", pady=(2, 10))
+        ttk.Label(
+            snapshot_heading, text="Recent snapshots", style="Section.TLabel"
+        ).pack(side="left")
+        ttk.Label(
+            snapshot_heading, text="Right-click a row to delete it.",
+            style="Muted.TLabel"
+        ).pack(side="right")
         self.recent_tree = self._tree(
             tab, ("date", "status", "followers", "following"),
             ("Date", "Status", "Followers", "Following"), (220, 150, 130, 130), height=6
         )
+        self.recent_tree.bind("<Button-3>", self._open_snapshot_context_menu)
 
     def _build_snapshot_report(self):
         tab = self.snapshot_tab
@@ -1209,6 +1250,53 @@ class CirclioReportApp:
         tree.bind("<Double-1>", lambda event, table=tree: self._open_avatar(event, table))
         return tree
 
+    def _open_snapshot_context_menu(self, event):
+        item = self.recent_tree.identify_row(event.y)
+        if not item:
+            return
+        self.recent_tree.selection_set(item)
+        if self.snapshot_context_menu is None:
+            self.snapshot_context_menu = tk.Menu(self.root, tearoff=False)
+        self.snapshot_context_menu.delete(0, "end")
+        self.snapshot_context_menu.add_command(
+            label="Delete snapshot",
+            command=lambda snapshot_id=item: self._delete_snapshot(snapshot_id),
+        )
+        self.snapshot_context_menu.tk_popup(event.x_root, event.y_root)
+
+    def _delete_snapshot(self, snapshot_id):
+        try:
+            row = self.recent_tree.item(snapshot_id, "values")
+            if not row:
+                return self._error("Select a snapshot to delete.")
+            captured_at, status = row[:2]
+            if not messagebox.askyesno(
+                "Delete snapshot",
+                f"Delete this {status.lower()} snapshot from {captured_at}?\n\n"
+                "This cannot be undone.",
+                parent=self.root,
+            ):
+                return
+            connection = database_access.open_database(
+                self.data_dir / "instagram.db", create=False
+            )
+            try:
+                deleted = delete_snapshot(connection, int(snapshot_id))
+            finally:
+                connection.close()
+            if not deleted:
+                return self._error("This snapshot no longer exists.")
+            self.refresh()
+        except (
+            OSError,
+            ValueError,
+            RuntimeError,
+            encryption.EncryptionError,
+            encryption.MissingKeyError,
+            *database_access.SQLITE_ERRORS,
+        ) as error:
+            return self._error(f"Could not delete this snapshot:\n{error}")
+
     def _make_excel_icon(self):
         image = Image.new("RGB", (24, 24), "#18864b")
         draw = ImageDraw.Draw(image)
@@ -1276,6 +1364,7 @@ class CirclioReportApp:
             return self._error(f"Could not open this profile image:\n{error}")
         window = tk.Toplevel(self.root)
         window.title("Profile picture")
+        apply_app_icon(window, self.app_directory)
         window.configure(background=SURFACE)
         window.transient(self.root)
         window.resizable(False, False)
@@ -1363,6 +1452,10 @@ class CirclioReportApp:
         self._refresh_changes()
         if self.snapshots:
             self._load_snapshot_report()
+        else:
+            self._clear_tree(self.snapshot_tree)
+            self.snapshot_timestamp.configure(text="Choose a snapshot.")
+            self.snapshot_counts.configure(text="")
 
     def _fill_snapshots(self):
         self.snapshot_ids = {
@@ -1375,6 +1468,11 @@ class CirclioReportApp:
         ):
             box.configure(values=values)
         if not values:
+            for variable in (
+                self.browse_date, self.snapshot_report_date, self.export_date,
+                self.to_date, self.from_date,
+            ):
+                variable.set("")
             return
         variables = (
             self.browse_date, self.snapshot_report_date, self.export_date, self.to_date
@@ -1425,7 +1523,7 @@ class CirclioReportApp:
                 self.recent_tree.insert("", "end", values=(
                     format_timestamp(latest_partial[1]), "Partial",
                     f"{followers_count:,}", f"{following_count:,}",
-                ))
+                ), iid=str(latest_partial[0]))
                 self._refresh_tree_search(self.recent_tree)
                 return
             self.latest_label.configure(text="No complete snapshots yet")
@@ -1478,13 +1576,13 @@ class CirclioReportApp:
                 format_timestamp(item[1]), "Complete",
                 f"{result.count_members(self.connection, item[0], 'followers'):,}",
                 f"{result.count_members(self.connection, item[0], 'following'):,}",
-            ))
+            ), iid=str(item[0]))
         if partial_is_newer:
             self.recent_tree.insert("", "end", values=(
                 format_timestamp(latest_partial[1]), "Partial",
                 f"{result.count_members(self.connection, latest_partial[0], 'followers'):,}",
                 f"{result.count_members(self.connection, latest_partial[0], 'following'):,}",
-            ))
+            ), iid=str(latest_partial[0]))
         self._refresh_tree_search(self.recent_tree)
 
     def _refresh_changes(self):
@@ -1842,6 +1940,7 @@ def _enable_encryption_from_ui(parent, data_dir):
 def _show_recovery_key(parent, recovery_key):
     window = tk.Toplevel(parent)
     window.title("Save your IB Circlio recovery key")
+    apply_app_icon(window, application_directory())
     window.transient(parent)
     window.resizable(False, False)
     ttk.Label(
@@ -1952,11 +2051,13 @@ def main():
     except OSError as error:
         root = tk.Tk()
         root.withdraw()
+        apply_app_icon(root, application_directory())
         messagebox.showerror("IB_Circlio could not start", str(error), parent=root)
         root.destroy()
         return
     database_path = data_dir / "instagram.db"
     root = tk.Tk()
+    apply_app_icon(root, application_directory())
     try:
         data_dir.mkdir(parents=True, exist_ok=True)
         was_plaintext = (

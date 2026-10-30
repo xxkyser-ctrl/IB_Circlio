@@ -1,3 +1,18 @@
+# IB Circlio v1.1.0
+
+## What's new
+
+- Stop collecting an exact Instagram list as soon as its displayed total is reached, avoiding extra links after the actual list.
+- Save a partial snapshot with a clear reason if collection stops making progress before the end of a list.
+- Add right-click deletion for complete and partial snapshots in the Overview list, with confirmation.
+- Apply the IB Circlio logo to the application and child windows from startup, including encryption and recovery-key dialogs.
+- Expand the website language selector to 14 languages, including RTL Arabic.
+
+## Important notes
+
+- Instagram may show approximate totals such as `200+` or `1.2K`; these are treated as minimums or estimates, not exact stopping targets.
+- Collections continue to reflect the accounts and totals Instagram makes available to the signed-in browser.
+
 # IB Circlio v1.0.9
 
 ## What's new

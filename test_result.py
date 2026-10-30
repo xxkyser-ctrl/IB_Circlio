@@ -35,6 +35,37 @@ class SnapshotReportTests(unittest.TestCase):
         self.database.connection.commit()
         return collection["id"]
 
+    def test_application_icon_is_applied_to_root_and_child_windows(self):
+        class FakeWindow:
+            def __init__(self, master=None):
+                self.master = master
+
+            def iconbitmap(self, path):
+                self.bitmap = path
+
+            def iconphoto(self, default, image):
+                self.photo = (default, image)
+
+        with tempfile.TemporaryDirectory() as directory:
+            icons = Path(directory) / "icons"
+            icons.mkdir()
+            ico_path = icons / "ib-circlio.ico"
+            png_path = icons / "ib-128.png"
+            ico_path.write_bytes(b"icon")
+            png_path.write_bytes(b"png")
+            image = object()
+            root = FakeWindow()
+            child = FakeWindow(root)
+            with patch("result_gui.tk.PhotoImage", return_value=image) as photo_image:
+                self.assertIs(result_gui.apply_app_icon(root, directory), image)
+                self.assertIs(result_gui.apply_app_icon(child, directory), image)
+
+            self.assertEqual(root.bitmap, str(ico_path))
+            self.assertEqual(child.bitmap, str(ico_path))
+            self.assertEqual(root.photo, (True, image))
+            self.assertEqual(child.photo, (True, image))
+            photo_image.assert_called_once_with(file=str(png_path), master=root)
+
     def test_compare_accepts_arbitrary_dates_and_normalizes_order(self):
         self.save("2026-09-18T10:00:00+00:00", ["alice"], ["x"])
         self.save("2026-09-19T10:00:00+00:00", ["alice", "bob"], ["y"])
@@ -172,6 +203,57 @@ class SnapshotReportTests(unittest.TestCase):
         self.assertEqual(len(choices), 2)
         self.assertNotEqual(choices[0][1], choices[1][1])
         self.assertNotEqual(choices[0][0], choices[1][0])
+
+    def test_delete_snapshot_cascades_for_complete_and_partial_collections(self):
+        complete_id = self.save(
+            "2026-10-01T10:00:00+00:00", ["alice"], ["following_fixture"]
+        )
+        later_id = self.save(
+            "2026-10-02T10:00:00+00:00",
+            ["alice", "new_follower"],
+            ["following_fixture"],
+        )
+        partial = self.database.save_collection({
+            "profile": "owner",
+            "followers": ["partial_follower"],
+            "following": [],
+            "complete": False,
+            "error": "Stopped before reaching the bottom.",
+        })
+        user_id = self.database.connection.execute(
+            "SELECT id FROM users WHERE username = 'alice'"
+        ).fetchone()[0]
+        self.database.connection.execute(
+            """INSERT INTO collection_avatar_versions
+               (collection_id, user_id, image_path, source_url, fetched_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (later_id, user_id, "avatars/old.jpg", "https://example.test/a", "now"),
+        )
+        self.database.connection.commit()
+
+        self.assertTrue(result_gui.delete_snapshot(self.database.connection, later_id))
+        self.assertTrue(
+            result_gui.delete_snapshot(self.database.connection, partial["id"])
+        )
+        self.assertFalse(result_gui.delete_snapshot(self.database.connection, later_id))
+        remaining_ids = {
+            row[0] for row in self.database.connection.execute(
+                "SELECT id FROM collections"
+            )
+        }
+        self.assertEqual(remaining_ids, {complete_id})
+        for table in (
+            "collection_memberships",
+            "membership_changes",
+            "collection_avatar_versions",
+        ):
+            self.assertEqual(
+                self.database.connection.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE collection_id IN (?, ?)",
+                    (later_id, partial["id"]),
+                ).fetchone()[0],
+                0,
+            )
 
     def test_gui_count_audit_rejects_impossible_following_total(self):
         collection = self.database.save_collection({

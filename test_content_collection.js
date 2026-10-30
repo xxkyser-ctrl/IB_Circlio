@@ -89,8 +89,10 @@ class FakeList {
 function makeHarness(family, {
   followerCount,
   followingCount,
+  followerHeader,
   followingHeader,
-  delayedPageChecks = 0
+  delayedPageChecks = 0,
+  stuckScroll = false
 }) {
   const lists = {
     followers: new FakeList(followerCount, 40, delayedPageChecks),
@@ -102,7 +104,7 @@ function makeHarness(family, {
   let clock = 0;
   const listeners = [];
   const profileLinks = {
-    followers: makeProfileLink("followers", followerCount),
+    followers: makeProfileLink("followers", followerCount, followerHeader),
     following: makeProfileLink("following", followingCount, followingHeader)
   };
 
@@ -128,6 +130,7 @@ function makeHarness(family, {
             return scrollTop;
           },
           set scrollTop(value) {
+            if (stuckScroll) return;
             scrollTop = Math.min(value, Math.max(0, this.scrollHeight - this.clientHeight));
             list.visibleStart = Math.floor(scrollTop / 40);
           },
@@ -233,6 +236,9 @@ function makeHarness(family, {
     get savedCollection() {
       return savedCollection;
     },
+    get elapsed() {
+      return clock;
+    },
     async startCollection() {
       return new Promise((resolve) => {
         const listener = listeners[0];
@@ -291,5 +297,35 @@ for (const family of ["chrome", "firefox"]) {
     assert.equal(response.collection.error, response.error);
     assert.equal(extension.savedCollection.error, response.error);
     assert.equal(extension.savedCollection.following.length, 122);
+  });
+
+  test(`${family}: stops at an exact profile total instead of collecting trailing rows`, async () => {
+    const extension = makeHarness(family, {
+      followerCount: 435,
+      followingCount: 3,
+      followerHeader: "434 followers"
+    });
+
+    const response = await extension.startCollection();
+
+    assert.equal(response.ok, true);
+    assert.equal(response.collection.complete, true, response.error || "snapshot was incomplete");
+    assert.equal(extension.savedCollection.followers.length, 434);
+    assert.equal(extension.savedCollection.followers.includes("fixture_0434"), false);
+  });
+
+  test(`${family}: saves a partial snapshot promptly when scrolling stalls before the end`, async () => {
+    const extension = makeHarness(family, {
+      followerCount: 100,
+      followingCount: 3,
+      stuckScroll: true
+    });
+
+    const response = await extension.startCollection();
+
+    assert.equal(response.ok, true);
+    assert.equal(response.collection.complete, false);
+    assert.match(response.error, /stopped making progress before the end/i);
+    assert.ok(extension.elapsed < 40000, `scan took ${extension.elapsed}ms`);
   });
 }
