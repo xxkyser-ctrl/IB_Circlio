@@ -1,6 +1,7 @@
 import contextlib
 import io
 import tempfile
+from types import SimpleNamespace
 import unittest
 import zipfile
 import xml.etree.ElementTree as ET
@@ -65,6 +66,38 @@ class SnapshotReportTests(unittest.TestCase):
             self.assertEqual(root.photo, (True, image))
             self.assertEqual(child.photo, (True, image))
             photo_image.assert_called_once_with(file=str(png_path), master=root)
+
+    def test_overview_mousewheel_scrolls_dashboard_and_recent_snapshots(self):
+        class FakeWidget:
+            def __init__(self, path):
+                self.path = path
+
+            def __str__(self):
+                return self.path
+
+        dashboard = FakeWidget(".dashboard")
+        canvas = FakeWidget(".dashboard.!canvas")
+        tree = FakeWidget(".dashboard.!canvas.!treeview")
+        app = object.__new__(result_gui.CirclioReportApp)
+        app.dashboard_tab = dashboard
+        app.dashboard_canvas = canvas
+        app.recent_tree = tree
+        app.notebook = SimpleNamespace(select=lambda: str(dashboard))
+        app.root = SimpleNamespace(winfo_containing=lambda _x, _y: canvas)
+        canvas_scrolls = []
+        tree_scrolls = []
+        canvas.yview_scroll = lambda *args: canvas_scrolls.append(args)
+        tree.yview_scroll = lambda *args: tree_scrolls.append(args)
+        event = SimpleNamespace(x_root=10, y_root=10, delta=120, num=None)
+
+        self.assertEqual(app._scroll_overview(event), "break")
+        self.assertEqual(canvas_scrolls, [(-3, "units")])
+        self.assertEqual(tree_scrolls, [])
+
+        app.root.winfo_containing = lambda _x, _y: tree
+        event.num = 5
+        self.assertEqual(app._scroll_overview(event), "break")
+        self.assertEqual(tree_scrolls, [(1, "units")])
 
     def test_compare_accepts_arbitrary_dates_and_normalizes_order(self):
         self.save("2026-09-18T10:00:00+00:00", ["alice"], ["x"])

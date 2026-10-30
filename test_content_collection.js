@@ -93,7 +93,9 @@ function makeHarness(family, {
   followerHeader,
   followingHeader,
   delayedPageMs = 0,
-  stuckScroll = false
+  stuckScroll = false,
+  scrollableDecoy = false,
+  visibleLinkCount = 10
 }) {
   const lists = {
     followers: new FakeList(followerCount, 40, delayedPageMs),
@@ -125,6 +127,7 @@ function makeHarness(family, {
         let scrollTop = 0;
         const container = {
           clientHeight: 100,
+          parentElement: null,
           get scrollHeight() {
             return Math.max(100, list.loaded * 40);
           },
@@ -142,6 +145,14 @@ function makeHarness(family, {
             }
           }
         };
+        const decoyContainer = scrollableDecoy ? {
+          clientHeight: 100,
+          scrollHeight: 100000,
+          scrollTop: 0,
+          parentElement: null,
+          dispatchEvent() {}
+        } : null;
+        container.parentElement = decoyContainer;
         const closeButton = new FakeCloseButton(() => {
           dialog = null;
           currentList = null;
@@ -153,21 +164,32 @@ function makeHarness(family, {
           get textContent() {
             return list.users.slice(0, list.loaded).join(" ");
           },
+          parentElement: null,
           getBoundingClientRect() {
             return { top: 100, right: 500 };
           },
           dispatchEvent() {},
           querySelectorAll(selector) {
-            if (selector === "div") return [container];
+            if (selector === "div") {
+              return decoyContainer ? [decoyContainer, container] : [container];
+            }
             if (selector === "a[href]") {
-              return list.users.slice(list.visibleStart, list.visibleStart + 10).map((username) =>
-                new FakeLink(username, { querySelectorAll: () => [] })
-              );
+              return list.users.slice(
+                list.visibleStart, list.visibleStart + visibleLinkCount
+              ).map((username) => {
+                const row = {
+                  parentElement: container,
+                  querySelectorAll: () => []
+                };
+                return new FakeLink(username, row);
+              });
             }
             if (selector.startsWith("button")) return [closeButton];
             return [];
           }
         };
+        if (decoyContainer) decoyContainer.parentElement = dialog;
+        container.parentElement = decoyContainer || dialog;
       }
     };
   }
@@ -330,6 +352,23 @@ for (const family of ["chrome", "firefox"]) {
     assert.equal(response.collection.complete, false);
     assert.equal(extension.savedCollection.followers.length, 433);
     assert.match(response.error, /433 collected.*Instagram shows 434/i);
+  });
+
+  test(`${family}: collects 434 accounts when only 14 are initially visible`, async () => {
+    const extension = makeHarness(family, {
+      followerCount: 434,
+      followingCount: 230,
+      delayedPageMs: 1100,
+      scrollableDecoy: true,
+      visibleLinkCount: 14
+    });
+
+    const response = await extension.startCollection();
+
+    assert.equal(response.ok, true);
+    assert.equal(response.collection.complete, true, response.error || "snapshot was incomplete");
+    assert.equal(extension.savedCollection.followers.length, 434);
+    assert.equal(extension.savedCollection.following.length, 230);
   });
 
   test(`${family}: saves a partial snapshot promptly when scrolling stalls before the end`, async () => {

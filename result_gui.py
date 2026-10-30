@@ -359,6 +359,9 @@ class CirclioReportApp:
         self._configure_styles()
         self._build_layout()
         self.root.bind_all("<Button-1>", self._close_avatar_on_app_click, add="+")
+        self.root.bind_all("<MouseWheel>", self._scroll_overview, add="+")
+        self.root.bind_all("<Button-4>", self._scroll_overview, add="+")
+        self.root.bind_all("<Button-5>", self._scroll_overview, add="+")
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
             launcher.prepare_extension_configs(
@@ -970,12 +973,43 @@ class CirclioReportApp:
 
     def _build_dashboard(self):
         tab = self.dashboard_tab
-        ttk.Label(tab, text="At a glance", style="Section.TLabel").pack(anchor="w")
+        scroll_area = ttk.Frame(tab)
+        scroll_area.pack(fill="both", expand=True)
+        self.dashboard_canvas = tk.Canvas(
+            scroll_area,
+            background=BACKGROUND,
+            borderwidth=0,
+            highlightthickness=0,
+        )
+        scrollbar = ttk.Scrollbar(
+            scroll_area, orient="vertical", command=self.dashboard_canvas.yview
+        )
+        self.dashboard_canvas.configure(yscrollcommand=scrollbar.set)
+        self.dashboard_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        content = ttk.Frame(self.dashboard_canvas)
+        content_window = self.dashboard_canvas.create_window(
+            (0, 0), window=content, anchor="nw"
+        )
+        content.bind(
+            "<Configure>",
+            lambda _event: self.dashboard_canvas.configure(
+                scrollregion=self.dashboard_canvas.bbox("all")
+            ),
+        )
+        self.dashboard_canvas.bind(
+            "<Configure>",
+            lambda event: self.dashboard_canvas.itemconfigure(
+                content_window, width=event.width
+            ),
+        )
+
+        ttk.Label(content, text="At a glance", style="Section.TLabel").pack(anchor="w")
         ttk.Label(
-            tab, text="Your latest complete snapshot and what changed.",
+            content, text="Your latest complete snapshot and what changed.",
             style="Muted.TLabel"
         ).pack(anchor="w", pady=(2, 18))
-        cards = ttk.Frame(tab)
+        cards = ttk.Frame(content)
         cards.pack(fill="x", pady=(0, 18))
         self.card_values = {}
         for key, title in (
@@ -998,15 +1032,17 @@ class CirclioReportApp:
             )
             value.pack(fill="x", padx=16, pady=(0, 13))
             self.card_values[key] = value
-        snapshot = ttk.Frame(tab)
+        snapshot = ttk.Frame(content)
         snapshot.pack(fill="x", pady=(0, 16))
         self.latest_label = ttk.Label(snapshot, text="No snapshot loaded", style="Section.TLabel")
         self.latest_label.pack(side="left")
         self.status_label = ttk.Label(snapshot, text="", style="Muted.TLabel")
         self.status_label.pack(side="right")
-        self.count_health_label = ttk.Label(tab, text="", style="Muted.TLabel", wraplength=840)
+        self.count_health_label = ttk.Label(
+            content, text="", style="Muted.TLabel", wraplength=840
+        )
         self.count_health_label.pack(fill="x", anchor="w", pady=(0, 12))
-        buttons = ttk.Frame(tab)
+        buttons = ttk.Frame(content)
         buttons.pack(fill="x", pady=(0, 20))
         ttk.Button(
             buttons, text="View changes", style="Accent.TButton",
@@ -1016,7 +1052,7 @@ class CirclioReportApp:
             buttons, text="Create Excel report",
             command=lambda: self._export_selected(self.latest_collection)
         ).pack(side="left", padx=8)
-        snapshot_heading = ttk.Frame(tab)
+        snapshot_heading = ttk.Frame(content)
         snapshot_heading.pack(fill="x", pady=(2, 10))
         ttk.Label(
             snapshot_heading, text="Recent snapshots", style="Section.TLabel"
@@ -1030,6 +1066,32 @@ class CirclioReportApp:
             ("Date", "Status", "Followers", "Following"), (220, 150, 130, 130), height=6
         )
         self.recent_tree.bind("<Button-3>", self._open_snapshot_context_menu)
+
+    def _scroll_overview(self, event):
+        if self.notebook.select() != str(self.dashboard_tab):
+            return
+        widget = self.root.winfo_containing(event.x_root, event.y_root)
+        if widget is None:
+            return
+        widget_path = str(widget)
+        tree_path = str(self.recent_tree)
+        canvas_path = str(self.dashboard_canvas)
+        if widget_path != tree_path and not widget_path.startswith(tree_path + "."):
+            if widget_path != canvas_path and not widget_path.startswith(canvas_path + "."):
+                return
+        if getattr(event, "num", None) == 4:
+            units = -1
+        elif getattr(event, "num", None) == 5:
+            units = 1
+        else:
+            delta = event.delta
+            units = -1 if delta > 0 else 1 if delta < 0 else 0
+        if units:
+            if widget_path == tree_path or widget_path.startswith(tree_path + "."):
+                self.recent_tree.yview_scroll(units, "units")
+            else:
+                self.dashboard_canvas.yview_scroll(units * 3, "units")
+        return "break"
 
     def _build_snapshot_report(self):
         tab = self.snapshot_tab

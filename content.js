@@ -9,7 +9,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
   const excludedPaths = new Set([
     "accounts", "direct", "explore", "reel", "reels", "stories", "p", "tv", "create"
   ]);
-  const NO_NEW_USER_WAIT_MS = 1250;
+  const NO_NEW_USER_WAIT_MS = 5000;
   const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
   function sendRuntimeMessage(message) {
@@ -42,18 +42,31 @@ const ext = globalThis.browser ?? globalThis.chrome;
   }
 
   function findScrollContainer(dialog) {
-    const candidates = [dialog, ...dialog.querySelectorAll("div")];
-    const scrollable = candidates.filter((element) => {
+    const scrollRange = (element) => element.scrollHeight - element.clientHeight;
+    const isScrollable = (element) => {
       const style = getComputedStyle(element);
-      return element.scrollHeight > element.clientHeight + 10 &&
+      return scrollRange(element) > 10 &&
         element.clientHeight > 0 &&
-        (style.overflowY === "auto" || style.overflowY === "scroll" ||
-          style.overflowY === "hidden" || element === dialog);
-    });
-    const selected = scrollable.sort((left, right) =>
-      (right.scrollHeight - right.clientHeight) - (left.scrollHeight - left.clientHeight)
+      (style.overflowY === "auto" || style.overflowY === "scroll" ||
+        style.overflowY === "hidden");
+    };
+    const candidates = new Set(
+      [...dialog.querySelectorAll("div")].filter(isScrollable)
+    );
+    if (isScrollable(dialog)) candidates.add(dialog);
+
+    for (const link of dialog.querySelectorAll("a[href]")) {
+      if (!usernameFromHref(link.getAttribute("href"))) continue;
+      let ancestor = link.parentElement;
+      while (ancestor && ancestor !== dialog) {
+        if (candidates.has(ancestor)) return ancestor;
+        ancestor = ancestor.parentElement;
+      }
+    }
+
+    return [...candidates].sort((left, right) =>
+      scrollRange(left) - scrollRange(right)
     )[0] || dialog;
-    return selected;
   }
 
   function extractUsernames(dialog, users, avatars, targetCount = null) {
