@@ -1,3 +1,17 @@
+# IB Circlio v1.1.1
+
+## What's new
+
+- Stop a list scan after a scroll produces no new usernames, allowing one short wait for delayed Instagram rendering and one targeted retry when only one account is missing.
+- Report incomplete counts as partial snapshots instead of continuing to scroll without finding new accounts.
+- Disable the Stop button immediately after it is pressed and keep the popup status on “Stopping collection...” until the scan ends.
+- Check that the local collection service is running before scanning an Instagram profile, with a clear instruction to start it when unavailable.
+
+## Important notes
+
+- The app never fabricates missing usernames to match Instagram's displayed total. If Instagram does not render the final account after the retry, the snapshot is marked partial with the count discrepancy.
+- Collection remains limited to accounts Instagram exposes to the signed-in browser.
+
 # IB Circlio v1.1.0
 
 ## What's new

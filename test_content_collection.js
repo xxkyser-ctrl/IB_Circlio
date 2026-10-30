@@ -61,7 +61,7 @@ class FakeCloseButton {
 }
 
 class FakeList {
-  constructor(total, pageSize, delayedPageChecks) {
+  constructor(total, pageSize, delayedPageMs) {
     this.users = Array.from(
       { length: total },
       (_value, index) => `fixture_${String(index).padStart(4, "0")}`
@@ -69,20 +69,21 @@ class FakeList {
     this.pageSize = pageSize;
     this.loaded = Math.min(total, pageSize);
     this.visibleStart = 0;
-    this.delayedPageChecks = delayedPageChecks;
-    this.waitingChecks = 0;
+    this.delayedPageMs = delayedPageMs;
+    this.loading = false;
   }
 
   get hasMore() {
     return this.loaded < this.users.length;
   }
 
-  maybeLoadMore() {
-    if (!this.hasMore) return;
-    this.waitingChecks += 1;
-    if (this.waitingChecks <= this.delayedPageChecks) return;
-    this.loaded = Math.min(this.users.length, this.loaded + this.pageSize);
-    this.waitingChecks = 0;
+  maybeLoadMore(schedule) {
+    if (!this.hasMore || this.loading) return;
+    this.loading = true;
+    schedule(() => {
+      this.loaded = Math.min(this.users.length, this.loaded + this.pageSize);
+      this.loading = false;
+    }, this.delayedPageMs);
   }
 }
 
@@ -91,18 +92,19 @@ function makeHarness(family, {
   followingCount,
   followerHeader,
   followingHeader,
-  delayedPageChecks = 0,
+  delayedPageMs = 0,
   stuckScroll = false
 }) {
   const lists = {
-    followers: new FakeList(followerCount, 40, delayedPageChecks),
-    following: new FakeList(followingCount, 40, delayedPageChecks)
+    followers: new FakeList(followerCount, 40, delayedPageMs),
+    following: new FakeList(followingCount, 40, delayedPageMs)
   };
   let currentList = null;
   let dialog = null;
   let savedCollection = null;
   let clock = 0;
   const listeners = [];
+  let schedule;
   const profileLinks = {
     followers: makeProfileLink("followers", followerCount, followerHeader),
     following: makeProfileLink("following", followingCount, followingHeader)
@@ -136,7 +138,7 @@ function makeHarness(family, {
           },
           dispatchEvent() {
             if (this.scrollTop + this.clientHeight >= this.scrollHeight - 10) {
-              list.maybeLoadMore();
+              list.maybeLoadMore(schedule);
             }
           }
         };
@@ -229,6 +231,7 @@ function makeHarness(family, {
     },
     clearTimeout() {}
   });
+  schedule = context.setTimeout;
   vm.runInContext(source, context, { filename: "content.js" });
 
   return {
@@ -254,11 +257,11 @@ function makeHarness(family, {
 }
 
 for (const family of ["chrome", "firefox"]) {
-  test(`${family}: waits for delayed following pages before saving a complete snapshot`, async () => {
+  test(`${family}: waits for delayed pages after one scroll before saving a complete snapshot`, async () => {
     const extension = makeHarness(family, {
       followerCount: 30,
       followingCount: 230,
-      delayedPageChecks: 10
+      delayedPageMs: 1100
     });
 
     const response = await extension.startCollection();
@@ -314,6 +317,21 @@ for (const family of ["chrome", "firefox"]) {
     assert.equal(extension.savedCollection.followers.includes("fixture_0434"), false);
   });
 
+  test(`${family}: saves 433 of 434 followers as partial instead of claiming completion`, async () => {
+    const extension = makeHarness(family, {
+      followerCount: 433,
+      followingCount: 3,
+      followerHeader: "434 followers"
+    });
+
+    const response = await extension.startCollection();
+
+    assert.equal(response.ok, true);
+    assert.equal(response.collection.complete, false);
+    assert.equal(extension.savedCollection.followers.length, 433);
+    assert.match(response.error, /433 collected.*Instagram shows 434/i);
+  });
+
   test(`${family}: saves a partial snapshot promptly when scrolling stalls before the end`, async () => {
     const extension = makeHarness(family, {
       followerCount: 100,
@@ -325,7 +343,7 @@ for (const family of ["chrome", "firefox"]) {
 
     assert.equal(response.ok, true);
     assert.equal(response.collection.complete, false);
-    assert.match(response.error, /stopped making progress before the end/i);
+    assert.match(response.error, /no new usernames after scrolling/i);
     assert.ok(extension.elapsed < 40000, `scan took ${extension.elapsed}ms`);
   });
 }

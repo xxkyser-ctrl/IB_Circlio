@@ -1,10 +1,12 @@
 const ext = globalThis.browser ?? globalThis.chrome;
 const statusElement = document.getElementById("status");
 const startButton = document.getElementById("start");
+const stopButton = document.getElementById("stop");
 const updateBanner = document.getElementById("update-banner");
 const updatesCheckbox = document.getElementById("check-updates");
 let availableReleaseVersion = "";
 let availableReleaseUrl = "";
+let stopPending = false;
 
 function extensionCall(target, method, ...args) {
   if (globalThis.browser) return Promise.resolve(target[method](...args));
@@ -62,7 +64,7 @@ async function sendToTab(tabId, message) {
 
 function setBusy(isBusy) {
   startButton.disabled = isBusy;
-  document.getElementById("stop").disabled = !isBusy;
+  stopButton.disabled = !isBusy || stopPending;
 }
 
 async function refreshCollectionState() {
@@ -70,11 +72,15 @@ async function refreshCollectionState() {
     const tab = await getActiveInstagramTab();
     const response = await sendToTab(tab.id, { action: "getCollectionState" });
     if (!response?.ok) throw new Error(response?.error || "Could not read collection status.");
-    setBusy(Boolean(response.state.active));
-    setStatus(response.state.status || "Ready to collect the current profile.");
+    const active = Boolean(response.state.active);
+    if (!active) stopPending = false;
+    setBusy(active);
+    if (!stopPending) {
+      setStatus(response.state.status || "Ready to collect the current profile.");
+    }
   } catch (error) {
-    setBusy(false);
-    setStatus(`Status unavailable: ${error.message}`);
+    setBusy(stopPending);
+    if (!stopPending) setStatus(`Status unavailable: ${error.message}`);
   }
 }
 
@@ -107,9 +113,16 @@ async function refreshUpdateState() {
 
 async function startCollection() {
   if (startButton.disabled) return;
+  stopPending = false;
   setBusy(true);
   let collectionError = null;
   try {
+    const service = await sendRuntimeMessage({ action: "checkService" });
+    if (!service?.ok) {
+      throw new Error(
+        "The local service is not running. Open IB Circlio and click Start service."
+      );
+    }
     const tab = await getActiveInstagramTab();
     setStatus("Connecting to the profile...");
     const response = await sendToTab(tab.id, { action: "startCollection" });
@@ -133,13 +146,18 @@ async function startCollection() {
 }
 
 startButton.addEventListener("click", startCollection);
-document.getElementById("stop").addEventListener("click", async () => {
+stopButton.addEventListener("click", async () => {
+  if (stopButton.disabled || stopPending) return;
+  stopPending = true;
+  setBusy(true);
+  setStatus("Stopping collection...");
   try {
     const tab = await getActiveInstagramTab();
     const response = await sendToTab(tab.id, { action: "stop" });
     if (!response?.ok) throw new Error(response?.error || "Could not stop the collection.");
-    setStatus("Stopping collection...");
   } catch (error) {
+    stopPending = false;
+    await refreshCollectionState();
     setStatus(error.message);
   }
 });

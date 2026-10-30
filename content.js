@@ -9,8 +9,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
   const excludedPaths = new Set([
     "accounts", "direct", "explore", "reel", "reels", "stories", "p", "tv", "create"
   ]);
-  const STABLE_BOTTOM_ATTEMPTS = 12;
-  const MAX_STALLED_ATTEMPTS = 20;
+  const NO_NEW_USER_WAIT_MS = 1250;
   const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
   function sendRuntimeMessage(message) {
@@ -86,8 +85,8 @@ const ext = globalThis.browser ?? globalThis.chrome;
     if (!dialog) throw new Error(`${listType} dialog not detected.`);
     if (targetCount === 0) return [];
     const users = new Set();
-    let stableAttempts = 0;
     let attempts = 0;
+    let finalRecoveryAttempted = false;
 
     while (!state.stopRequested && attempts < 400) {
       const liveDialog = findDialog();
@@ -96,7 +95,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
       const addedBeforeScroll = extractUsernames(
         liveDialog, users, avatars, targetCount
       );
-      const previousTop = container.scrollTop;
+      if (targetCount !== null && users.size >= targetCount) break;
       const step = Math.max(240, Math.floor(Math.max(container.clientHeight, 300) * 0.85));
       container.scrollTop = Math.min(container.scrollTop + step, container.scrollHeight);
       container.dispatchEvent(new WheelEvent("wheel", {
@@ -111,7 +110,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
       const addedAfterScroll = extractUsernames(
         refreshedDialog, users, avatars, targetCount
       );
-      const added = addedBeforeScroll + addedAfterScroll;
+      let added = addedBeforeScroll + addedAfterScroll;
       attempts += 1;
       sendCollectionState(true, `Scanning ${listType}: ${users.size} usernames found`, {
         listType, count: users.size, attempts
@@ -119,21 +118,37 @@ const ext = globalThis.browser ?? globalThis.chrome;
 
       if (targetCount !== null && users.size >= targetCount) break;
 
-      const moved = refreshedContainer.scrollTop > previousTop + 2;
-      const atBottom = refreshedContainer.scrollTop + refreshedContainer.clientHeight >= refreshedContainer.scrollHeight - 10;
-      if (added === 0 && !moved) stableAttempts += 1;
-      else stableAttempts = 0;
-      if (atBottom && stableAttempts >= STABLE_BOTTOM_ATTEMPTS) break;
-      if (!atBottom && stableAttempts >= MAX_STALLED_ATTEMPTS) {
-        throw new Error(
-          `${listType} list stopped making progress before the end; ` +
-          `${users.size} usernames were collected. The snapshot is partial.`
-        );
-      }
-      if (!moved && added === 0) {
-        const visibleLinks = [...refreshedDialog.querySelectorAll("a[href]")].filter((link) => link.offsetParent !== null);
-        visibleLinks[visibleLinks.length - 1]?.scrollIntoView({ block: "end" });
-        await sleep(500);
+      if (added === 0) {
+        added = await waitForNewUsernames(listType, users, avatars) ? 1 : 0;
+        if (targetCount !== null && users.size >= targetCount) break;
+        if (added === 0 && targetCount !== null &&
+            targetCount - users.size === 1 && !finalRecoveryAttempted) {
+          finalRecoveryAttempted = true;
+          const visibleLinks = [
+            ...refreshedDialog.querySelectorAll("a[href]")
+          ].filter((link) => link.offsetParent !== null);
+          visibleLinks[visibleLinks.length - 1]?.scrollIntoView({ block: "end" });
+          refreshedContainer.scrollTop = refreshedContainer.scrollHeight;
+          refreshedContainer.dispatchEvent(new WheelEvent("wheel", {
+            bubbles: true,
+            cancelable: true,
+            deltaY: Math.max(refreshedContainer.clientHeight, 300)
+          }));
+          if (await waitForNewUsernames(listType, users, avatars)) {
+            if (users.size >= targetCount) break;
+            continue;
+          }
+        }
+        if (added === 0) {
+          if (targetCount === null) break;
+          const error = new Error(
+            `${listType} list showed no new usernames after scrolling; ` +
+            `${users.size} collected; Instagram shows ${targetCount}. ` +
+            "The snapshot is partial."
+          );
+          error.collectedUsernames = [...users].sort();
+          throw error;
+        }
       }
     }
     if (attempts >= 400 && !state.stopRequested) {
@@ -256,12 +271,23 @@ const ext = globalThis.browser ?? globalThis.chrome;
   }
 
   function headerTotalIsExact(listType) {
-    const text = headerTotalLabel(listType)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    const label = headerTotalLabel(listType);
+    if (!label) return false;
+    const text = label.toLowerCase().normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
     const match = text.match(/(\d[\d.,\s]*[kmb]?\+?)\s*([a-z()]+)/i);
     return Boolean(match && !/[kmb+]/i.test(match[1]));
+  }
+
+  async function waitForNewUsernames(listType, users, avatars) {
+    const deadline = Date.now() + NO_NEW_USER_WAIT_MS;
+    while (Date.now() < deadline) {
+      await sleep(250);
+      const dialog = findDialog();
+      if (!dialog) throw new Error(`${listType} dialog closed during scan.`);
+      if (extractUsernames(dialog, users, avatars) > 0) return true;
+    }
+    return false;
   }
 
   async function openList(listType) {
@@ -331,9 +357,16 @@ const ext = globalThis.browser ?? globalThis.chrome;
         const exactHeaderTotal = headerTotalIsExact(listType)
           ? headerTotalCount
           : null;
-        result[listType] = await scanDialog(
-          listType, result.avatars, exactHeaderTotal
-        );
+        try {
+          result[listType] = await scanDialog(
+            listType, result.avatars, exactHeaderTotal
+          );
+        } catch (error) {
+          if (Array.isArray(error.collectedUsernames)) {
+            result[listType] = error.collectedUsernames;
+          }
+          throw error;
+        }
         if (
           headerTotalCount !== null &&
           (exactHeaderTotal !== null

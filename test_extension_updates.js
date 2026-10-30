@@ -26,7 +26,13 @@ function makeEvent() {
   };
 }
 
-function createExtension(family, initialRelease, networkError = null) {
+function createExtension(
+  family,
+  initialRelease,
+  networkError = null,
+  serviceAvailable = true,
+  collectionInitiallyActive = false
+) {
   const storage = { checkForUpdates: true };
   const alarms = new Map();
   const runtimeMessages = makeEvent();
@@ -45,7 +51,14 @@ function createExtension(family, initialRelease, networkError = null) {
       if (callback) callback();
     }
   };
-  const counters = { releaseFetches: 0, warnings: [] };
+  const counters = {
+    releaseFetches: 0,
+    serviceChecks: 0,
+    collectionStarts: 0,
+    stopRequests: 0,
+    warnings: []
+  };
+  let collectionActive = collectionInitiallyActive;
   let release = initialRelease;
 
   function respond(value, callback) {
@@ -113,11 +126,17 @@ function createExtension(family, initialRelease, networkError = null) {
         callback
       );
     },
-    sendMessage(_tabId, _message, callback) {
-      return respond(
-        { ok: true, state: { active: false, status: "Ready" } },
-        callback
-      );
+    sendMessage(_tabId, message, callback) {
+      let response = { ok: true, state: { active: collectionActive, status: "Ready" } };
+      if (message.action === "startCollection") {
+        counters.collectionStarts += 1;
+        collectionActive = true;
+        response = { ok: true, collection: { complete: true, followers: [], following: [] } };
+      } else if (message.action === "stop") {
+        counters.stopRequests += 1;
+        response = { ok: true };
+      }
+      return respond(response, callback);
     },
     create(_details, callback) {
       return respond(undefined, callback);
@@ -166,6 +185,16 @@ function createExtension(family, initialRelease, networkError = null) {
       }
       if (url === "http://127.0.0.1:8765/version") {
         return { ok: true, json: async () => ({ ok: true, version: "1.0.8" }) };
+      }
+      if (url === "http://127.0.0.1:8765/api/health") {
+        counters.serviceChecks += 1;
+        return {
+          ok: serviceAvailable,
+          status: serviceAvailable ? 200 : 503,
+          json: async () => serviceAvailable
+            ? { ok: true, service: "IB Circlio" }
+            : { ok: false, error: "Service unavailable" }
+        };
       }
       throw new Error(`Unexpected fetch URL: ${url}`);
     },
@@ -220,6 +249,12 @@ function createExtension(family, initialRelease, networkError = null) {
     },
     async sendMessage(message) {
       return runtime.sendMessage(message);
+    },
+    setCollectionActive(active) {
+      collectionActive = active;
+    },
+    async fireRuntimeMessage(message) {
+      await runtimeMessages.fire(message, {}, () => {});
     }
   };
 }
@@ -235,6 +270,43 @@ function release(version) {
 }
 
 for (const family of ["chrome", "firefox"]) {
+  test(`${family}: collection checks the local service before starting`, async () => {
+    const extension = createExtension(family, null, null, false);
+    await extension.installPopup();
+
+    await extension.elements.get("start").listeners.click();
+
+    assert.equal(extension.counters.serviceChecks, 1);
+    assert.equal(extension.counters.collectionStarts, 0);
+    assert.match(
+      extension.elements.get("status").textContent,
+      /local service is not running.*Start service/i
+    );
+  });
+
+  test(`${family}: stop is disabled immediately and remains pending until collection ends`, async () => {
+    const extension = createExtension(family, null, null, true, true);
+    await extension.installPopup();
+    const stop = extension.elements.get("stop");
+
+    assert.equal(stop.disabled, false);
+    const stopping = stop.listeners.click();
+    assert.equal(stop.disabled, true);
+    assert.equal(extension.elements.get("status").textContent, "Stopping collection...");
+    await stopping;
+    assert.equal(extension.counters.stopRequests, 1);
+    assert.equal(stop.disabled, true);
+
+    extension.setCollectionActive(false);
+    await extension.fireRuntimeMessage({
+      action: "collectionState",
+      state: { active: false, status: "Collection stopped." }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(stop.disabled, true);
+    assert.equal(extension.elements.get("start").disabled, false);
+  });
+
   test(`${family}: newer release shows badge and popup banner; dismissal and toggle work`, async () => {
     const extension = createExtension(family, release("1.0.9"));
     await extension.fireInstalled();

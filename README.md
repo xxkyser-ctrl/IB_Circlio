@@ -46,7 +46,7 @@ The service listens on `127.0.0.1` and stores data on the same PC. The desktop a
 
 ## Installation
 
-IB Circlio is intended for Windows. Download the single [all-in-one Windows ZIP](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest/download/IB-Circlio-1.1.0-windows.zip). It contains the portable app, quick-start instructions, and extensions for Chromium browsers and Firefox. You do not need to choose or download a separate extension package, and the app does not require Python.
+IB Circlio is intended for Windows. Download the single [all-in-one Windows ZIP](https://github.com/xxkyser-ctrl/IB_Circlio/releases/latest/download/IB-Circlio-1.1.1-windows.zip). It contains the portable app, quick-start instructions, and extensions for Chromium browsers and Firefox. You do not need to choose or download a separate extension package, and the app does not require Python.
 
 1. Download the ZIP and choose **Extract All** in File Explorer. The extracted folder contains `ib_circlio.exe` and `INSTALL.txt` at its top level.
 2. Start `ib_circlio.exe`. In the **Collection service** tab, select **Start service** and wait for **Running**.
@@ -160,7 +160,7 @@ Released under the MIT License. See [LICENSE](LICENSE). Third-party software is 
 The all-in-one Windows ZIP is accompanied by `SHA256SUMS.txt`. After downloading, compare the file's SHA-256 digest with its line in the checksum file. For example:
 
 ```powershell
-Get-FileHash .\IB-Circlio-1.1.0-windows.zip -Algorithm SHA256
+Get-FileHash .\IB-Circlio-1.1.1-windows.zip -Algorithm SHA256
 ```
 
 The `VERSION` constant in `version.py` is the source version for the desktop app, local service, and portable build; the build synchronizes both packaged browser manifests to it.

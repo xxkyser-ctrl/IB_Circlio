@@ -174,6 +174,16 @@ async function apiRequest(path, method = "GET", body) {
 }
 
 ext.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.action === "checkService") {
+    apiRequest("/api/health")
+      .then((payload) => sendResponse({
+        ok: true,
+        service: payload.service,
+        version: EXTENSION_VERSION
+      }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   if (message.action === "getUpdateState") {
     storedUpdateState()
       .then(async (state) => {
