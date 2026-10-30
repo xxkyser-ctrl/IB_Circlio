@@ -2,6 +2,7 @@
 
 ## What's new
 
+- Fix Instagram dialogs with scrollable account rows by selecting the list container that contains the most unique accounts, so collection can continue beyond the initially visible rows.
 - Stop a list scan after a scroll produces no new usernames, allowing one short wait for delayed Instagram rendering and one targeted retry when only one account is missing.
 - Report incomplete counts as partial snapshots instead of continuing to scroll without finding new accounts.
 - Disable the Stop button immediately after it is pressed and keep the popup status on “Stopping collection...” until the scan ends.
@@ -9,7 +10,7 @@
 
 ## Important notes
 
-- The app never fabricates missing usernames to match Instagram's displayed total. If Instagram does not render the final account after the retry, the snapshot is marked partial with the count discrepancy.
+- The app never fabricates missing usernames to match Instagram's displayed total. If Instagram does not render an account after the retry, the snapshot is marked partial with the count discrepancy.
 - Collection remains limited to accounts Instagram exposes to the signed-in browser.
 
 # IB Circlio v1.1.0
